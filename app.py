@@ -2,6 +2,7 @@ import os
 import uuid
 from flask import Flask, jsonify, render_template, request, session
 from supabase import create_client, Client
+from werkzeug.exceptions import HTTPException
 
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -121,8 +122,9 @@ def home():
     return render_template("email_system.html")
 
 
+@app.get("/health")
 @app.get("/healthz")
-def healthz():
+def health():
     return jsonify({"status": "ok"}), 200
 
 
@@ -277,7 +279,16 @@ def api_reset():
 
 @app.errorhandler(Exception)
 def handle_exception(error):
-    return jsonify({"error": str(error)}), 500
+    if isinstance(error, HTTPException):
+        return jsonify(
+            {
+                "error": error.name,
+                "message": error.description,
+            }
+        ), error.code
+
+    app.logger.exception("Unhandled application error")
+    return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
