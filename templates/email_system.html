@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Interactive Python email system demo running with Flask, Render and Supabase." />
-  <title>Python Email System | Render Demo</title>
+  <meta name="description" content="Self-hosted domain email client for IMAP and SMTP submission." />
+  <title>Domain Mail</title>
 
   <style>
     :root {
-      --bg: #090d17;
-      --panel: #111827;
-      --panel-2: #172033;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --accent: #38bdf8;
-      --accent-2: #a78bfa;
-      --border: rgba(255, 255, 255, 0.12);
-      --danger: #fb7185;
-      --ok: #34d399;
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      --bg: #f7f7f4;
+      --surface: #ffffff;
+      --surface-2: #f0f5f6;
+      --text: #152126;
+      --muted: #66757b;
+      --line: #d9e0e2;
+      --accent: #0f766e;
+      --accent-2: #2563eb;
+      --danger: #b42318;
+      --ok: #157f3b;
+      --shadow: 0 14px 44px rgba(18, 38, 46, 0.10);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -26,374 +26,503 @@
 
     body {
       margin: 0;
-      background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.22), transparent 34rem),
-        radial-gradient(circle at top right, rgba(167, 139, 250, 0.20), transparent 30rem),
-        var(--bg);
-      color: var(--text);
       min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
     }
 
-    header, main, footer {
-      width: min(1120px, calc(100% - 32px));
-      margin: 0 auto;
-    }
-
-    header { padding: 42px 0 24px; }
-
-    .eyebrow {
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      font-size: 0.78rem;
-      font-weight: 800;
-    }
-
-    h1 {
-      margin: 12px 0 14px;
-      font-size: clamp(2.25rem, 7vw, 5.5rem);
-      line-height: 0.95;
-      letter-spacing: -0.06em;
-    }
-
-    .gradient {
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-
-    .lead {
-      max-width: 780px;
-      color: var(--muted);
-      font-size: 1.08rem;
-      line-height: 1.75;
-      margin: 0;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
-      gap: 22px;
-      align-items: start;
-      padding: 18px 0 42px;
-    }
-
-    .card {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
-      border: 1px solid var(--border);
-      border-radius: 28px;
-      box-shadow: var(--shadow);
-      padding: 24px;
-    }
-
-    .card h2, .card h3 {
-      margin-top: 0;
-      letter-spacing: -0.03em;
-    }
-
-    label {
-      display: block;
-      color: var(--muted);
-      font-weight: 700;
-      font-size: 0.88rem;
-      margin: 14px 0 8px;
-    }
-
-    input, select, textarea, button {
-      width: 100%;
-      border-radius: 16px;
-      border: 1px solid var(--border);
+    button,
+    input,
+    textarea {
       font: inherit;
     }
 
-    input, select, textarea {
+    button {
+      min-height: 40px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 750;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
       color: var(--text);
-      background: rgba(0, 0, 0, 0.25);
-      padding: 13px 14px;
+      padding: 11px 12px;
       outline: none;
     }
 
     textarea {
-      min-height: 120px;
+      min-height: 210px;
       resize: vertical;
-    }
-
-    input:focus, select:focus, textarea:focus {
-      border-color: rgba(56, 189, 248, 0.68);
-      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
-    }
-
-    button {
-      cursor: pointer;
-      padding: 13px 16px;
-      color: #03111d;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      font-weight: 900;
-      border: 0;
-      margin-top: 16px;
-    }
-
-    button.secondary {
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid var(--border);
-    }
-
-    button.danger {
-      color: #21020a;
-      background: var(--danger);
-    }
-
-    .two-cols {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .notice {
-      min-height: 24px;
-      margin-top: 14px;
-      color: var(--ok);
-      font-weight: 700;
-    }
-
-    .notice.error { color: var(--danger); }
-
-    .inbox-grid {
-      display: grid;
-      gap: 16px;
-    }
-
-    .inbox {
-      background: rgba(0, 0, 0, 0.18);
-      border: 1px solid var(--border);
-      border-radius: 22px;
-      padding: 18px;
-    }
-
-    .inbox-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: baseline;
-      margin-bottom: 12px;
-    }
-
-    .inbox-header h3 { margin: 0; }
-
-    .count {
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
-
-    .email-item {
-      display: grid;
-      gap: 10px;
-      padding: 14px;
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.045);
-      margin-bottom: 10px;
-    }
-
-    .email-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 999px;
-      padding: 4px 9px;
-      font-size: 0.76rem;
-      font-weight: 900;
-      background: rgba(52, 211, 153, 0.15);
-      color: var(--ok);
-      border: 1px solid rgba(52, 211, 153, 0.28);
-      white-space: nowrap;
-    }
-
-    .badge.unread {
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent);
-      border-color: rgba(56, 189, 248, 0.32);
-    }
-
-    .subject {
-      font-weight: 900;
-      font-size: 1rem;
-    }
-
-    .meta {
-      color: var(--muted);
-      font-size: 0.88rem;
       line-height: 1.5;
     }
 
-    .email-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+    input:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
     }
 
-    .email-actions button {
-      width: auto;
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 18px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 900;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 2px;
+      font-size: 1.05rem;
+      line-height: 1.2;
+    }
+
+    .subtle {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 0 14px;
+    }
+
+    .secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      padding: 0 14px;
+    }
+
+    .danger {
+      background: #fff0ee;
+      color: var(--danger);
+      border: 1px solid #f2bbb5;
+      padding: 0 14px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 230px minmax(300px, 410px) minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .pane {
+      min-height: calc(100vh - 63px);
+      border-right: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .folders {
+      padding: 14px;
+    }
+
+    .folder-button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      margin-bottom: 4px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      font-weight: 650;
+    }
+
+    .folder-button.active {
+      background: var(--surface-2);
+      color: var(--accent);
+    }
+
+    .folder-role {
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+
+    .list-pane {
+      background: #fbfcfc;
+    }
+
+    .pane-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      min-height: 64px;
+    }
+
+    .pane-head h2 {
       margin: 0;
-      padding: 9px 11px;
-      border-radius: 12px;
-      font-size: 0.86rem;
+      font-size: 1rem;
+    }
+
+    .message-list {
+      padding: 8px;
+      overflow-y: auto;
+      max-height: calc(100vh - 128px);
+    }
+
+    .message-item {
+      width: 100%;
+      display: grid;
+      gap: 5px;
+      padding: 12px;
+      margin-bottom: 6px;
+      background: var(--surface);
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--text);
+      text-align: left;
+    }
+
+    .message-item.active {
+      border-color: rgba(15, 118, 110, 0.42);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.08);
+    }
+
+    .message-item.unread .subject {
+      font-weight: 900;
+    }
+
+    .sender-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .subject {
+      overflow-wrap: anywhere;
+      font-weight: 650;
+    }
+
+    .reader {
+      padding: 18px;
+      overflow-y: auto;
+      max-height: calc(100vh - 63px);
+      background: var(--bg);
+    }
+
+    .reader-card,
+    .auth-card,
+    .compose-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .reader-card {
+      min-height: calc(100vh - 100px);
+      padding: 20px;
+    }
+
+    .message-meta {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 18px;
+    }
+
+    .body {
+      white-space: pre-wrap;
+      line-height: 1.65;
+      overflow-wrap: anywhere;
     }
 
     .empty {
+      display: grid;
+      place-items: center;
+      min-height: 300px;
       color: var(--muted);
-      border: 1px dashed var(--border);
-      border-radius: 16px;
-      padding: 16px;
-      margin: 0;
+      text-align: center;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 24px;
     }
 
-    dialog {
-      width: min(680px, calc(100% - 28px));
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      background: var(--panel);
-      color: var(--text);
-      box-shadow: var(--shadow);
-      padding: 0;
+    .auth-screen {
+      min-height: calc(100vh - 63px);
+      display: grid;
+      place-items: center;
+      padding: 18px;
     }
 
-    dialog::backdrop { background: rgba(0, 0, 0, 0.72); }
-
-    .modal-content { padding: 24px; }
-
-    .modal-body {
-      white-space: pre-wrap;
-      background: rgba(0, 0, 0, 0.24);
-      border-radius: 18px;
-      border: 1px solid var(--border);
-      padding: 16px;
-      line-height: 1.6;
+    .auth-card,
+    .compose-card {
+      width: min(520px, 100%);
+      padding: 22px;
     }
 
-    footer {
+    .auth-card h2,
+    .compose-card h2 {
+      margin-bottom: 16px;
+      font-size: 1.15rem;
+    }
+
+    label {
+      display: block;
+      margin: 13px 0 7px;
       color: var(--muted);
-      padding: 0 0 34px;
+      font-size: 0.86rem;
+      font-weight: 700;
     }
 
-    code { color: var(--accent); }
+    .notice {
+      min-height: 22px;
+      margin-top: 12px;
+      color: var(--ok);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
 
-    @media (max-width: 860px) {
-      .grid, .two-cols { grid-template-columns: 1fr; }
+    .notice.error {
+      color: var(--danger);
+    }
+
+    .compose-wrap {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(21, 33, 38, 0.38);
+      z-index: 20;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .compose-wrap.open {
+      display: flex;
+    }
+
+    .compose-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 980px) {
+      .layout {
+        grid-template-columns: 190px minmax(260px, 1fr);
+      }
+
+      .reader {
+        grid-column: 1 / -1;
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .top-actions {
+        width: 100%;
+        justify-content: stretch;
+      }
+
+      .top-actions button {
+        flex: 1;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .pane,
+      .reader {
+        min-height: auto;
+        max-height: none;
+      }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="eyebrow">Flask // Render // Supabase</div>
-    <h1><span class="gradient">Python Email</span><br />System</h1>
-    <p class="lead">
-      Interactive version of the console email simulator. The browser sends actions to a Flask backend,
-      and the backend persists users, inboxes and email state in Supabase PostgreSQL.
-    </p>
-  </header>
-
-  <main class="grid">
-    <section class="card" aria-label="Controls">
-      <h2>Run the simulation</h2>
-      <p class="lead">Create two demo users, send emails between them, read messages and delete them.</p>
-
-      <form id="users-form">
-        <div class="two-cols">
-          <div>
-            <label for="user1">User 1</label>
-            <input id="user1" name="user1" value="User1" autocomplete="off" />
-          </div>
-          <div>
-            <label for="user2">User 2</label>
-            <input id="user2" name="user2" value="User2" autocomplete="off" />
-          </div>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">@</div>
+        <div>
+          <h1>Domain Mail</h1>
+          <div id="server-summary" class="subtle">IMAP + SMTP</div>
         </div>
-        <button type="submit">Save users</button>
+      </div>
+      <div class="top-actions">
+        <span id="account-label" class="subtle"></span>
+        <button id="compose-button" class="primary hidden" type="button">Compose</button>
+        <button id="refresh-button" class="secondary hidden" type="button">Refresh</button>
+        <button id="logout-button" class="secondary hidden" type="button">Logout</button>
+      </div>
+    </header>
+
+    <section id="auth-screen" class="auth-screen">
+      <form id="login-form" class="auth-card">
+        <h2>Sign in</h2>
+        <label for="email">Mailbox</label>
+        <input id="email" name="email" type="email" autocomplete="username" required />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <button class="primary" type="submit">Sign in</button>
+        <div id="login-notice" class="notice" role="status" aria-live="polite"></div>
       </form>
+    </section>
 
-      <form id="email-form">
-        <label for="sender">Sender</label>
-        <select id="sender" name="sender">
-          <option value="1">User 1 sends to User 2</option>
-          <option value="2">User 2 sends to User 1</option>
-        </select>
+    <main id="mail-layout" class="layout hidden">
+      <aside class="pane folders">
+        <div id="folders"></div>
+      </aside>
 
+      <section class="pane list-pane">
+        <div class="pane-head">
+          <h2 id="folder-title">Inbox</h2>
+          <span id="message-count" class="subtle"></span>
+        </div>
+        <div id="message-list" class="message-list"></div>
+      </section>
+
+      <section class="reader">
+        <article id="reader-card" class="reader-card">
+          <div class="empty">Select a message</div>
+        </article>
+      </section>
+    </main>
+
+    <section id="compose-wrap" class="compose-wrap" aria-hidden="true">
+      <form id="compose-form" class="compose-card">
+        <h2>New message</h2>
+        <label for="to">To</label>
+        <input id="to" name="to" type="text" autocomplete="off" required />
         <label for="subject">Subject</label>
-        <input id="subject" name="subject" placeholder="Example: Meeting notes" autocomplete="off" />
-
+        <input id="subject" name="subject" type="text" autocomplete="off" required />
         <label for="body">Body</label>
-        <textarea id="body" name="body" placeholder="Write the message body here..."></textarea>
-
-        <button type="submit">Send email</button>
-        <button class="secondary" id="reset-demo" type="button">Reset demo</button>
+        <textarea id="body" name="body" required></textarea>
+        <div class="compose-actions">
+          <button id="cancel-compose" class="secondary" type="button">Cancel</button>
+          <button class="primary" type="submit">Send</button>
+        </div>
+        <div id="compose-notice" class="notice" role="status" aria-live="polite"></div>
       </form>
-
-      <div id="notice" class="notice" role="status" aria-live="polite"></div>
     </section>
-
-    <section class="card" aria-label="Inboxes">
-      <h2>Inboxes</h2>
-      <div id="inboxes" class="inbox-grid"></div>
-    </section>
-  </main>
-
-  <dialog id="email-modal">
-    <div class="modal-content">
-      <h2 id="modal-subject">Email</h2>
-      <p id="modal-meta" class="meta"></p>
-      <div id="modal-body" class="modal-body"></div>
-      <button class="secondary" id="close-modal" type="button">Close</button>
-    </div>
-  </dialog>
-
-  <footer>
-    <p>Demo backend: <code>Flask</code> + <code>Gunicorn</code> + <code>Supabase PostgreSQL</code>.</p>
-  </footer>
+  </div>
 
   <script>
-    const inboxes = document.querySelector('#inboxes');
-    const notice = document.querySelector('#notice');
-    const usersForm = document.querySelector('#users-form');
-    const emailForm = document.querySelector('#email-form');
-    const resetButton = document.querySelector('#reset-demo');
-    const senderSelect = document.querySelector('#sender');
-    const modal = document.querySelector('#email-modal');
-    const modalSubject = document.querySelector('#modal-subject');
-    const modalMeta = document.querySelector('#modal-meta');
-    const modalBody = document.querySelector('#modal-body');
-    const closeModal = document.querySelector('#close-modal');
+    const authScreen = document.querySelector('#auth-screen');
+    const mailLayout = document.querySelector('#mail-layout');
+    const loginForm = document.querySelector('#login-form');
+    const loginNotice = document.querySelector('#login-notice');
+    const foldersNode = document.querySelector('#folders');
+    const messageList = document.querySelector('#message-list');
+    const readerCard = document.querySelector('#reader-card');
+    const folderTitle = document.querySelector('#folder-title');
+    const messageCount = document.querySelector('#message-count');
+    const accountLabel = document.querySelector('#account-label');
+    const serverSummary = document.querySelector('#server-summary');
+    const composeButton = document.querySelector('#compose-button');
+    const refreshButton = document.querySelector('#refresh-button');
+    const logoutButton = document.querySelector('#logout-button');
+    const composeWrap = document.querySelector('#compose-wrap');
+    const composeForm = document.querySelector('#compose-form');
+    const composeNotice = document.querySelector('#compose-notice');
+    const cancelCompose = document.querySelector('#cancel-compose');
 
-    let state = null;
+    let csrfToken = '';
+    let currentFolder = 'INBOX';
+    let currentUid = '';
+    let folders = [];
 
-    function showNotice(message, isError = false) {
-      notice.textContent = message;
-      notice.classList.toggle('error', isError);
+    function showNotice(node, message, isError = false) {
+      node.textContent = message;
+      node.classList.toggle('error', isError);
     }
 
     async function requestJSON(url, options = {}) {
-      const response = await fetch(url, {
-        headers: { 'Content-Type': 'application/json' },
-        ...options,
-      });
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      if (csrfToken && options.method && options.method !== 'GET') {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+
+      const response = await fetch(url, { ...options, headers });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Request failed.');
+        throw new Error(data.error || data.message || 'Request failed.');
       }
       return data;
     }
 
     function escapeHTML(value) {
-      return String(value)
+      return String(value || '')
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;')
@@ -403,160 +532,202 @@
 
     function formatDate(value) {
       const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+      return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
     }
 
-    function getUserName(slot) {
-      return slot === 1 ? state.user1_name : state.user2_name;
+    function setAuthenticated(state) {
+      csrfToken = state.csrf_token || csrfToken;
+      accountLabel.textContent = state.user || '';
+      serverSummary.textContent = [state.imap_host, state.smtp_host].filter(Boolean).join(' / ') || 'IMAP + SMTP';
+      authScreen.classList.toggle('hidden', state.authenticated);
+      mailLayout.classList.toggle('hidden', !state.authenticated);
+      composeButton.classList.toggle('hidden', !state.authenticated);
+      refreshButton.classList.toggle('hidden', !state.authenticated);
+      logoutButton.classList.toggle('hidden', !state.authenticated);
     }
 
-    function updateSenderLabels() {
-      const user1 = state?.user1_name || 'User 1';
-      const user2 = state?.user2_name || 'User 2';
-      senderSelect.options[0].textContent = `${user1} sends to ${user2}`;
-      senderSelect.options[1].textContent = `${user2} sends to ${user1}`;
-      document.querySelector('#user1').value = user1;
-      document.querySelector('#user2').value = user2;
+    function renderFolders() {
+      foldersNode.innerHTML = folders.map((folder) => `
+        <button class="folder-button ${folder.name === currentFolder ? 'active' : ''}" type="button" data-folder="${escapeHTML(folder.name)}">
+          <span>${escapeHTML(folder.display_name || folder.name)}</span>
+          <span class="folder-role">${escapeHTML(folder.role || '')}</span>
+        </button>
+      `).join('');
     }
 
-    function normalizeEmail(email) {
-      return {
-        id: email.id,
-        sender: email.sender_name,
-        receiver: email.receiver_name,
-        subject: email.subject,
-        body: email.body,
-        timestamp: formatDate(email.created_at),
-        read: email.is_read,
-        status: email.is_read ? 'Read' : 'Unread',
-      };
+    function renderMessageList(messages) {
+      folderTitle.textContent = currentFolder;
+      messageCount.textContent = `${messages.length} shown`;
+
+      if (!messages.length) {
+        messageList.innerHTML = '<div class="empty">No messages</div>';
+        return;
+      }
+
+      messageList.innerHTML = messages.map((message) => `
+        <button class="message-item ${message.uid === currentUid ? 'active' : ''} ${message.is_read ? '' : 'unread'}" type="button" data-uid="${message.uid}">
+          <span class="sender-row">
+            <span>${escapeHTML(message.from || message.to || '(unknown)')}</span>
+            <span>${escapeHTML(formatDate(message.date || ''))}</span>
+          </span>
+          <span class="subject">${escapeHTML(message.subject)}</span>
+        </button>
+      `).join('');
     }
 
-    function emailTemplate(email) {
-      const item = normalizeEmail(email);
-      const badgeClass = item.read ? 'badge' : 'badge unread';
-      return `
-        <article class="email-item">
-          <div class="email-top">
-            <span class="subject">${escapeHTML(item.subject)}</span>
-            <span class="${badgeClass}">${item.status}</span>
-          </div>
-          <div class="meta">From: ${escapeHTML(item.sender)}<br />Received: ${escapeHTML(item.timestamp)}</div>
-          <div class="email-actions">
-            <button class="secondary" type="button" data-action="read" data-id="${item.id}">Read</button>
-            <button class="danger" type="button" data-action="delete" data-id="${item.id}">Delete</button>
-          </div>
-        </article>
+    function renderReader(message) {
+      readerCard.innerHTML = `
+        <div class="message-meta">
+          <h2>${escapeHTML(message.subject)}</h2>
+          <span>From: ${escapeHTML(message.from || '(unknown)')}</span>
+          <span>To: ${escapeHTML(message.to || '')}</span>
+          <span>Date: ${escapeHTML(formatDate(message.date || ''))}</span>
+        </div>
+        <div class="body">${escapeHTML(message.body || '')}</div>
+        ${message.attachments && message.attachments.length ? `<p class="subtle">${message.attachments.length} attachment(s)</p>` : ''}
+        <div class="compose-actions">
+          <button class="danger" id="delete-current" type="button">Delete</button>
+        </div>
       `;
-    }
-
-    function renderInbox(slot) {
-      const emails = state.inboxes[String(slot)] || [];
-      const userName = getUserName(slot);
-      const body = emails.length
-        ? emails.map(email => emailTemplate(email)).join('')
-        : '<p class="empty">Inbox is empty.</p>';
-
-      return `
-        <section class="inbox">
-          <div class="inbox-header">
-            <h3>${escapeHTML(userName)}'s Inbox</h3>
-            <span class="count">${emails.length} email${emails.length === 1 ? '' : 's'}</span>
-          </div>
-          ${body}
-        </section>
-      `;
-    }
-
-    function renderState(nextState) {
-      state = nextState;
-      updateSenderLabels();
-      inboxes.innerHTML = renderInbox(1) + renderInbox(2);
     }
 
     async function loadState() {
-      const data = await requestJSON('/api/state');
-      renderState(data);
+      const state = await requestJSON('/api/state');
+      setAuthenticated(state);
+      if (state.authenticated) {
+        await loadFolders();
+        await loadMessages();
+      }
     }
 
-    usersForm.addEventListener('submit', async (event) => {
+    async function loadFolders() {
+      const data = await requestJSON('/api/folders');
+      folders = data.folders || [];
+      if (!folders.some((folder) => folder.name === currentFolder)) {
+        currentFolder = folders[0]?.name || 'INBOX';
+      }
+      renderFolders();
+    }
+
+    async function loadMessages() {
+      currentUid = '';
+      readerCard.innerHTML = '<div class="empty">Select a message</div>';
+      const data = await requestJSON(`/api/messages?folder=${encodeURIComponent(currentFolder)}`);
+      renderMessageList(data.messages || []);
+    }
+
+    async function openMessage(uid) {
+      currentUid = uid;
+      await requestJSON(`/api/messages/${encodeURIComponent(uid)}/read?folder=${encodeURIComponent(currentFolder)}`, {
+        method: 'POST',
+        body: '{}',
+      });
+      const data = await requestJSON(`/api/messages/${encodeURIComponent(uid)}?folder=${encodeURIComponent(currentFolder)}`);
+      renderReader(data.message);
+      await refreshMessageListOnly();
+    }
+
+    async function refreshMessageListOnly() {
+      const data = await requestJSON(`/api/messages?folder=${encodeURIComponent(currentFolder)}`);
+      renderMessageList(data.messages || []);
+    }
+
+    loginForm.addEventListener('submit', async (event) => {
       event.preventDefault();
+      showNotice(loginNotice, '');
       try {
-        const data = await requestJSON('/api/users', {
+        const data = await requestJSON('/api/login', {
           method: 'POST',
           body: JSON.stringify({
-            user1_name: document.querySelector('#user1').value,
-            user2_name: document.querySelector('#user2').value,
+            email: document.querySelector('#email').value,
+            password: document.querySelector('#password').value,
           }),
         });
-        renderState(data);
-        showNotice('Users saved.');
+        setAuthenticated(data);
+        await loadFolders();
+        await loadMessages();
+        loginForm.reset();
       } catch (error) {
-        showNotice(error.message, true);
+        showNotice(loginNotice, error.message, true);
       }
     });
 
-    emailForm.addEventListener('submit', async (event) => {
+    logoutButton.addEventListener('click', async () => {
+      await requestJSON('/api/logout', { method: 'POST', body: '{}' });
+      folders = [];
+      currentFolder = 'INBOX';
+      currentUid = '';
+      await loadState();
+    });
+
+    refreshButton.addEventListener('click', async () => {
+      await loadFolders();
+      await loadMessages();
+    });
+
+    foldersNode.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-folder]');
+      if (!button) return;
+      currentFolder = button.dataset.folder;
+      renderFolders();
+      await loadMessages();
+    });
+
+    messageList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-uid]');
+      if (!button) return;
+      await openMessage(button.dataset.uid);
+    });
+
+    readerCard.addEventListener('click', async (event) => {
+      if (event.target.id !== 'delete-current' || !currentUid) return;
+      await requestJSON(`/api/messages/${encodeURIComponent(currentUid)}?folder=${encodeURIComponent(currentFolder)}`, {
+        method: 'DELETE',
+        body: '{}',
+      });
+      currentUid = '';
+      await loadMessages();
+    });
+
+    composeButton.addEventListener('click', () => {
+      composeWrap.classList.add('open');
+      composeWrap.setAttribute('aria-hidden', 'false');
+      composeNotice.textContent = '';
+      document.querySelector('#to').focus();
+    });
+
+    cancelCompose.addEventListener('click', () => {
+      composeWrap.classList.remove('open');
+      composeWrap.setAttribute('aria-hidden', 'true');
+      composeForm.reset();
+    });
+
+    composeForm.addEventListener('submit', async (event) => {
       event.preventDefault();
+      showNotice(composeNotice, '');
       try {
         const data = await requestJSON('/api/send', {
           method: 'POST',
           body: JSON.stringify({
-            sender_slot: Number(senderSelect.value),
+            to: document.querySelector('#to').value,
             subject: document.querySelector('#subject').value,
             body: document.querySelector('#body').value,
           }),
         });
-        renderState(data);
-        emailForm.reset();
-        updateSenderLabels();
-        showNotice('Email sent.');
-      } catch (error) {
-        showNotice(error.message, true);
-      }
-    });
-
-    resetButton.addEventListener('click', async () => {
-      try {
-        const data = await requestJSON('/api/reset', { method: 'POST' });
-        renderState(data);
-        showNotice('Demo reset.');
-      } catch (error) {
-        showNotice(error.message, true);
-      }
-    });
-
-    inboxes.addEventListener('click', async (event) => {
-      const button = event.target.closest('button[data-action]');
-      if (!button) return;
-
-      const action = button.dataset.action;
-      const id = button.dataset.id;
-
-      try {
-        if (action === 'read') {
-          const data = await requestJSON(`/api/read/${id}`, { method: 'POST' });
-          renderState(data.state);
-          const email = normalizeEmail(data.email);
-          modalSubject.textContent = email.subject;
-          modalMeta.textContent = `From: ${email.sender} · To: ${email.receiver} · Received: ${email.timestamp}`;
-          modalBody.textContent = email.body;
-          modal.showModal();
+        composeForm.reset();
+        composeWrap.classList.remove('open');
+        composeWrap.setAttribute('aria-hidden', 'true');
+        if (data.warning) {
+          showNotice(loginNotice, data.warning, true);
         }
-
-        if (action === 'delete') {
-          const data = await requestJSON(`/api/email/${id}`, { method: 'DELETE' });
-          renderState(data);
-          showNotice('Email deleted.');
-        }
+        await loadFolders();
+        await loadMessages();
       } catch (error) {
-        showNotice(error.message, true);
+        showNotice(composeNotice, error.message, true);
       }
     });
 
-    closeModal.addEventListener('click', () => modal.close());
-
-    loadState().catch(error => showNotice(error.message, true));
+    loadState().catch((error) => showNotice(loginNotice, error.message, true));
   </script>
 </body>
 </html>
