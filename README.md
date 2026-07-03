@@ -1,54 +1,51 @@
-# Email Client
+# Domain Mail
 
-Interactive Python Email System demo built with Flask, Render and Supabase PostgreSQL.
+Flask webmail client for a self-hosted domain mail server. The app signs in to
+real mailboxes over IMAP, sends mail through authenticated SMTP submission, and
+uses server-side sessions so mailbox passwords are not stored in browser cookies.
+
+This replaces the original two-user email simulator. It no longer uses Supabase
+as a mailbox database.
 
 ## What this service does
 
-- Serves the email client web UI.
-- Creates two demo users per browser session.
-- Sends emails between both users.
-- Lists inboxes.
-- Marks emails as read.
-- Deletes emails.
-- Persists data in Supabase using the `email_demo_sessions` and `email_demo_emails` tables.
+- Logs in with a real mailbox, such as `admin@example.com`.
+- Lists IMAP folders.
+- Lists recent messages in a folder.
+- Opens messages and marks them as read.
+- Deletes messages through IMAP.
+- Sends messages through SMTP submission.
+- Requires STARTTLS before SMTP authentication on port `587`.
+- Saves a sent copy to the IMAP Sent folder when available.
 
-## Render configuration
+## What this service does not do
 
-Build Command:
+- It does not run the domain mail server itself.
+- It does not replace Postfix, Dovecot, DKIM signing, antispam, or MX handling.
+- It does not provide end-to-end encryption. It uses transparent TLS/ECDHE for
+  transport encryption, so recipients read mail normally.
 
-```bash
-pip install -r requirements.txt
-```
+For the mail server infrastructure, see
+[`docs/mail-server-setup.md`](docs/mail-server-setup.md).
 
-Start Command:
-
-```bash
-gunicorn app:app
-```
-
-Health Check Path:
-
-```text
-/healthz
-```
-
-## Required Render environment variables
-
-Set these in the Render dashboard. Do not commit real secrets to GitHub.
+## Required environment variables
 
 ```env
-SUPABASE_URL=https://zzgavefdyzbukbrowzot.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-FLASK_SECRET_KEY=your_long_random_secret
+MAIL_DOMAIN=example.com
+IMAP_HOST=mail.example.com
+IMAP_PORT=993
+SMTP_HOST=mail.example.com
+SMTP_SUBMISSION_PORT=587
+FLASK_SECRET_KEY=change-me-to-a-long-random-secret
+SESSION_REDIS_URL=redis://localhost:6379/0
+SESSION_TTL_SECONDS=28800
+SEND_RATE_LIMIT_PER_HOUR=60
+MAX_MESSAGE_LIST_SIZE=50
+SESSION_COOKIE_SECURE=true
 ```
 
-## Python version
-
-This repo pins Python with `runtime.txt`:
-
-```text
-python-3.12.7
-```
+`SESSION_REDIS_URL` is strongly recommended in production. If it is missing, the
+app falls back to filesystem-backed sessions for local development.
 
 ## Local development
 
@@ -56,6 +53,7 @@ python-3.12.7
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
 flask --app app run --debug
 ```
 
@@ -65,5 +63,49 @@ On Windows PowerShell:
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env.example .env
 flask --app app run --debug
+```
+
+## Production notes
+
+You may host this Flask web UI on any HTTPS-capable web host that can reach your
+mail server on `993` and `587`. The actual mail server should run on a VPS with
+port `25`, reverse DNS, SPF, DKIM, DMARC, MTA-STS, TLS-RPT, and antispam.
+
+Render can serve the Flask web app, but it should not be used as the MX/mail
+server for the domain.
+
+Start command:
+
+```bash
+gunicorn app:app
+```
+
+Health check path:
+
+```text
+/healthz
+```
+
+## API
+
+- `POST /api/login`
+- `POST /api/logout`
+- `GET /api/folders`
+- `GET /api/messages?folder=INBOX`
+- `GET /api/messages/<uid>?folder=INBOX`
+- `POST /api/messages/<uid>/read?folder=INBOX`
+- `DELETE /api/messages/<uid>?folder=INBOX`
+- `POST /api/send`
+
+All write endpoints except login require the `X-CSRF-Token` returned by
+`GET /api/state`.
+
+## Python version
+
+This repo pins Python with `runtime.txt`:
+
+```text
+python-3.12.7
 ```
