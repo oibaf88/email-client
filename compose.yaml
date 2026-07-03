@@ -1,0 +1,88 @@
+name: domain-mail
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: domain-mail-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    volumes:
+      - ./docker-data/redis:/data
+    networks:
+      - internal
+
+  web:
+    build: .
+    container_name: domain-mail-web
+    depends_on:
+      - redis
+      - mailserver
+    env_file:
+      - .env
+    environment:
+      IMAP_HOST: ${MAIL_FQDN}
+      IMAP_PORT: 993
+      SMTP_HOST: ${MAIL_FQDN}
+      SMTP_SUBMISSION_PORT: 587
+      SESSION_REDIS_URL: redis://redis:6379/0
+      SESSION_COOKIE_SECURE: "true"
+    expose:
+      - "8000"
+    restart: unless-stopped
+    networks:
+      - internal
+
+  mailserver:
+    image: ${DMS_IMAGE}
+    container_name: mailserver
+    hostname: ${MAIL_HOSTNAME}
+    domainname: ${MAIL_DOMAIN}
+    env_file:
+      - ./infra/mailserver/mailserver.env
+    environment:
+      OVERRIDE_HOSTNAME: ${MAIL_FQDN}
+      POSTMASTER_ADDRESS: ${POSTMASTER_ADDRESS}
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - ./docker-data/dms/mail-data:/var/mail
+      - ./docker-data/dms/mail-state:/var/mail-state
+      - ./docker-data/dms/mail-logs:/var/log/mail
+      - ./infra/mailserver/config:/tmp/docker-mailserver
+      - ./docker-data/letsencrypt:/etc/letsencrypt:ro
+      - /etc/localtime:/etc/localtime:ro
+    cap_add:
+      - NET_ADMIN
+    stop_grace_period: 1m
+    restart: unless-stopped
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: domain-mail-caddy
+    depends_on:
+      - web
+    environment:
+      WEBMAIL_FQDN: ${WEBMAIL_FQDN}
+      MTA_STS_FQDN: ${MTA_STS_FQDN}
+      CERT_NAME: ${CERT_NAME}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./infra/mta-sts:/srv/mta-sts:ro
+      - ./docker-data/letsencrypt:/etc/letsencrypt:ro
+      - ./docker-data/caddy/data:/data
+      - ./docker-data/caddy/config:/config
+    restart: unless-stopped
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
