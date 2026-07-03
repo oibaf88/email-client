@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.git
+.venv
+venv
+env
+__pycache__
+*.pyc
+flask_session
+docker-data
+.pytest_cache
+.mypy_cache
+.ruff_cache
