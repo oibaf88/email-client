@@ -1,0 +1,4 @@
+version: STSv1
+mode: testing
+mx: ${MAIL_FQDN}
+max_age: 86400
