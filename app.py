@@ -14,10 +14,13 @@ from email.utils import formatdate, getaddresses, make_msgid
 from functools import wraps
 from secrets import token_urlsafe
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request, session
 from flask_session import Session
 from werkzeug.exceptions import HTTPException
 
+
+load_dotenv()
 
 MAIL_DOMAIN = os.environ.get("MAIL_DOMAIN", "").strip().lower()
 IMAP_HOST = os.environ.get("IMAP_HOST", "").strip()
