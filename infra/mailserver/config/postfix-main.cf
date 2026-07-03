@@ -1,0 +1,23 @@
+# Strict transport policy for outbound delivery.
+# This intentionally refuses delivery to remote MX hosts that do not advertise STARTTLS.
+smtp_tls_security_level = encrypt
+smtp_tls_loglevel = 1
+smtp_tls_mandatory_protocols = >=TLSv1.2
+smtp_tls_protocols = >=TLSv1.2
+smtp_tls_mandatory_ciphers = high
+smtp_tls_CApath = /etc/ssl/certs
+
+# Inbound SMTP on port 25 cannot require TLS for every sender, but MTA-STS and
+# TLS-RPT advertise and monitor TLS expectations for compliant external MTAs.
+smtpd_tls_security_level = may
+smtpd_tls_auth_only = yes
+smtpd_tls_loglevel = 1
+smtpd_tls_mandatory_protocols = >=TLSv1.2
+smtpd_tls_protocols = >=TLSv1.2
+smtpd_tls_eecdh_grade = ultra
+tls_preempt_cipherlist = yes
+
+# Keep relay behavior explicit. Authenticated users can submit mail; unauthenticated
+# remote clients can only deliver to local domains.
+smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, defer_unauth_destination
+smtpd_recipient_restrictions = permit_sasl_authenticated, reject_unauth_destination
