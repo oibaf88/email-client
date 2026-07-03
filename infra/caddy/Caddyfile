@@ -1,0 +1,21 @@
+{$WEBMAIL_FQDN} {
+	tls /etc/letsencrypt/live/{$CERT_NAME}/fullchain.pem /etc/letsencrypt/live/{$CERT_NAME}/privkey.pem
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	reverse_proxy web:8000
+}
+
+{$MTA_STS_FQDN} {
+	tls /etc/letsencrypt/live/{$CERT_NAME}/fullchain.pem /etc/letsencrypt/live/{$CERT_NAME}/privkey.pem
+	root * /srv/mta-sts
+	file_server
+}
