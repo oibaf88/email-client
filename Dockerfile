@@ -1,18 +1,20 @@
-# syntax=docker/dockerfile:1
+FROM python:3.12-slim
 
-ARG PYTHON_VERSION=3.12.13
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-FROM python:${PYTHON_VERSION}-slim
+WORKDIR /app
 
-LABEL fly_launch_runtime="flask"
+RUN addgroup --system app && adduser --system --ingroup app app
 
-WORKDIR /code
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY requirements.txt requirements.txt
-RUN pip3 install -r requirements.txt
+COPY app.py .
+COPY templates ./templates
 
-COPY . .
+USER app
 
-EXPOSE 8080
+EXPOSE 8000
 
-CMD [ "python3", "-m" , "flask", "run", "--host=0.0.0.0", "--port=8080"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4", "--timeout", "60", "app:app"]
