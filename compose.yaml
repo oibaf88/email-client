@@ -59,7 +59,9 @@ services:
     stop_grace_period: 1m
     restart: unless-stopped
     networks:
-      - internal
+      internal:
+        aliases:
+          - ${MAIL_FQDN}
 
   caddy:
     image: caddy:2-alpine
