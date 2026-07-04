@@ -43,6 +43,9 @@ with Supabase as the mailbox store.
 - `infra/scripts/issue-cert.sh` requests Let's Encrypt certificates.
 - `infra/scripts/bootstrap-vps.sh` starts the stack, creates the first mailbox,
   and generates DKIM keys.
+- `infra/scripts/mailbox.sh` manages mailbox accounts after bootstrap.
+- `infra/scripts/alias.sh` manages forwarding aliases.
+- `infra/scripts/renew-cert.sh` renews certificates and reloads services.
 - `infra/scripts/check-mailserver.sh` checks DNS and TLS endpoints.
 - `infra/dns-records.example.md` lists the DNS records to publish.
 
@@ -96,6 +99,22 @@ Open:
 
 ```text
 https://webmail.example.com
+```
+
+## Mailbox administration
+
+The product has its own end-user webmail UI. Server administration happens on
+the VPS so it is not exposed to the public web interface:
+
+```bash
+infra/scripts/mailbox.sh list
+infra/scripts/mailbox.sh add user@example.com
+infra/scripts/mailbox.sh update user@example.com
+infra/scripts/mailbox.sh delete user@example.com
+
+infra/scripts/alias.sh list
+infra/scripts/alias.sh add info@example.com admin@example.com
+infra/scripts/alias.sh delete info@example.com admin@example.com
 ```
 
 ## Local web UI development
