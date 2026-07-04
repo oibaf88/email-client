@@ -1,0 +1,30 @@
+# Local Windows/macOS smoke-test override.
+# Production should use compose.yaml directly on a Linux VPS.
+
+services:
+  web:
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      SESSION_COOKIE_SECURE: "false"
+      SSL_CERT_FILE: /certs/fullchain.pem
+    volumes:
+      - ./docker-data/letsencrypt/live/${CERT_NAME}:/certs:ro
+
+  mailserver:
+    ports: !override
+      - "127.0.0.1:25:25"
+      - "127.0.0.1:465:465"
+      - "127.0.0.1:587:587"
+      - "127.0.0.1:993:993"
+    volumes: !override
+      - dms-mail-data:/var/mail
+      - dms-mail-state:/var/mail-state
+      - dms-mail-logs:/var/log/mail
+      - ./infra/mailserver/config:/tmp/docker-mailserver
+      - ./docker-data/letsencrypt:/etc/letsencrypt:ro
+
+volumes:
+  dms-mail-data:
+  dms-mail-state:
+  dms-mail-logs:
