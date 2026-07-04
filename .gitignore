@@ -22,3 +22,5 @@ instance/
 flask_session/
 docker-data/
 infra/mta-sts/.well-known/mta-sts.txt
+infra/mailserver/config/*
+!infra/mailserver/config/postfix-main.cf
