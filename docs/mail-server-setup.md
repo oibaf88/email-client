@@ -113,6 +113,10 @@ The script:
 
 After DKIM generation, publish the DKIM TXT record shown by docker-mailserver.
 
+The Docker network also gives the mailserver the `${MAIL_FQDN}` alias internally.
+That lets the web UI connect to the mailserver using the same hostname that
+appears on the TLS certificate, while traffic stays inside the Compose stack.
+
 ## 6. TLS/ECDHE policy
 
 The web UI uses Python's certificate validation and requires TLS 1.2 minimum for
@@ -158,6 +162,30 @@ Then test real delivery:
 4. Confirm the reply appears in the custom web UI.
 
 ## 8. Operations
+
+Create, list, update, or delete mailboxes from the VPS:
+
+```bash
+infra/scripts/mailbox.sh list
+infra/scripts/mailbox.sh add user@example.com
+infra/scripts/mailbox.sh update user@example.com
+infra/scripts/mailbox.sh delete user@example.com
+```
+
+Manage aliases:
+
+```bash
+infra/scripts/alias.sh list
+infra/scripts/alias.sh add info@example.com admin@example.com
+infra/scripts/alias.sh delete info@example.com admin@example.com
+```
+
+Renew certificates:
+
+```bash
+infra/scripts/renew-cert.sh
+infra/scripts/check-mailserver.sh
+```
 
 Back up these directories:
 
