@@ -330,20 +330,38 @@ def list_messages(folder: str) -> list[dict]:
 
         uids = (data[0] or b"").split()
         selected_uids = list(reversed(uids))[:MAX_MESSAGE_LIST_SIZE]
+
+        if not selected_uids:
+            return []
+
+        # Batch IMAP FETCH to reduce N+1 query problem
+        # Expected performance impact: Significant reduction in time taken to load the inbox message list
+        sequence = ",".join(decode_bytes(uid) for uid in selected_uids)
+        status, fetch_data = client.uid(
+            "FETCH",
+            sequence,
+            "(UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)] FLAGS)",
+        )
+
+        if status != "OK":
+            return []
+
         messages = []
+        for item in fetch_data or []:
+            if isinstance(item, tuple):
+                response_part = item[0] or b""
+                raw_headers = item[1] or b""
 
-        for raw_uid in selected_uids:
-            uid = decode_bytes(raw_uid)
-            status, fetch_data = client.uid(
-                "FETCH",
-                uid,
-                "(BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)] FLAGS)",
-            )
-            if status != "OK":
-                continue
-            raw_headers, flags = extract_payload(fetch_data)
-            messages.append(message_summary_from_headers(uid, raw_headers, flags))
+                uid_match = re.search(b"UID\\s+(?P<uid>\\d+)", response_part, re.IGNORECASE)
+                if not uid_match:
+                    continue
+                uid = decode_bytes(uid_match.group("uid"))
 
+                flags = parse_flags(response_part)
+                messages.append(message_summary_from_headers(uid, raw_headers, flags))
+
+        # IMAP servers don't guarantee returned order matches requested sequence
+        messages.sort(key=lambda m: int(m["uid"]), reverse=True)
         return messages
     finally:
         close_imap(client, selected=selected)
