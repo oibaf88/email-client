@@ -19,7 +19,6 @@ from flask import Flask, jsonify, render_template, request, session
 from flask_session import Session
 from werkzeug.exceptions import HTTPException
 
-
 load_dotenv()
 
 MAIL_DOMAIN = os.environ.get("MAIL_DOMAIN", "").strip().lower()
@@ -86,9 +85,7 @@ def require_mail_config() -> None:
         if not value
     ]
     if missing:
-        raise MailClientError(
-            f"Missing mail configuration: {', '.join(missing)}.", 503
-        )
+        raise MailClientError(f"Missing mail configuration: {', '.join(missing)}.", 503)
 
 
 def require_login(view):
@@ -265,7 +262,11 @@ def list_folders() -> list[dict]:
 
         preferred_order = {"inbox": 0, "sent": 1, "drafts": 2, "trash": 3, "junk": 4}
         return sorted(
-            folders, key=lambda item: (preferred_order.get(item["role"], 99), item["name"].lower())
+            folders,
+            key=lambda item: (
+                preferred_order.get(item["role"], 99),
+                item["name"].lower(),
+            ),
         )
     finally:
         close_imap(client)
@@ -306,7 +307,9 @@ def normalize_address_header(value) -> str:
     return ", ".join(address for _, address in addresses if address)
 
 
-def message_summary_from_headers(uid: str, raw_headers: bytes, flags: list[str]) -> dict:
+def message_summary_from_headers(
+    uid: str, raw_headers: bytes, flags: list[str]
+) -> dict:
     message = BytesParser(policy=policy.default).parsebytes(raw_headers or b"")
     return {
         "uid": uid,
@@ -330,21 +333,37 @@ def list_messages(folder: str) -> list[dict]:
 
         uids = (data[0] or b"").split()
         selected_uids = list(reversed(uids))[:MAX_MESSAGE_LIST_SIZE]
+
+        if not selected_uids:
+            return []
+
+        # Batch fetch all headers and flags in a single command
+        uid_list = ",".join(decode_bytes(uid) for uid in selected_uids)
+        status, fetch_data = client.uid(
+            "FETCH",
+            uid_list,
+            "(BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)] FLAGS)",
+        )
+        if status != "OK":
+            raise MailClientError("Could not fetch messages.", 503)
+
+        # We need to maintain the original reversed order
+        uid_order = {decode_bytes(uid): i for i, uid in enumerate(selected_uids)}
         messages = []
 
-        for raw_uid in selected_uids:
-            uid = decode_bytes(raw_uid)
-            status, fetch_data = client.uid(
-                "FETCH",
-                uid,
-                "(BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)] FLAGS)",
-            )
-            if status != "OK":
-                continue
-            raw_headers, flags = extract_payload(fetch_data)
-            messages.append(message_summary_from_headers(uid, raw_headers, flags))
+        for item in fetch_data or []:
+            if isinstance(item, tuple):
+                response_part, raw_headers = item
+                flags = parse_flags(response_part)
 
-        return messages
+                uid_match = re.search(rb"UID\s+(\d+)", response_part, re.IGNORECASE)
+                if uid_match:
+                    uid = uid_match.group(1).decode("utf-8")
+                    messages.append(
+                        message_summary_from_headers(uid, raw_headers, flags)
+                    )
+
+        return sorted(messages, key=lambda m: uid_order.get(m["uid"], 999))
     finally:
         close_imap(client, selected=selected)
 
