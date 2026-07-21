@@ -19,7 +19,6 @@ from flask import Flask, jsonify, render_template, request, session
 from flask_session import Session
 from werkzeug.exceptions import HTTPException
 
-
 load_dotenv()
 
 MAIL_DOMAIN = os.environ.get("MAIL_DOMAIN", "").strip().lower()
@@ -86,9 +85,7 @@ def require_mail_config() -> None:
         if not value
     ]
     if missing:
-        raise MailClientError(
-            f"Missing mail configuration: {', '.join(missing)}.", 503
-        )
+        raise MailClientError(f"Missing mail configuration: {', '.join(missing)}.", 503)
 
 
 def require_login(view):
@@ -265,7 +262,11 @@ def list_folders() -> list[dict]:
 
         preferred_order = {"inbox": 0, "sent": 1, "drafts": 2, "trash": 3, "junk": 4}
         return sorted(
-            folders, key=lambda item: (preferred_order.get(item["role"], 99), item["name"].lower())
+            folders,
+            key=lambda item: (
+                preferred_order.get(item["role"], 99),
+                item["name"].lower(),
+            ),
         )
     finally:
         close_imap(client)
@@ -306,7 +307,9 @@ def normalize_address_header(value) -> str:
     return ", ".join(address for _, address in addresses if address)
 
 
-def message_summary_from_headers(uid: str, raw_headers: bytes, flags: list[str]) -> dict:
+def message_summary_from_headers(
+    uid: str, raw_headers: bytes, flags: list[str]
+) -> dict:
     message = BytesParser(policy=policy.default).parsebytes(raw_headers or b"")
     return {
         "uid": uid,
@@ -317,6 +320,20 @@ def message_summary_from_headers(uid: str, raw_headers: bytes, flags: list[str])
         "message_id": decode_header_value(message.get("message-id")),
         "is_read": "\\Seen" in flags,
     }
+
+
+def extract_batched_payloads(fetch_data) -> list[tuple[str, bytes, list[str]]]:
+    results = []
+    for item in fetch_data or []:
+        if isinstance(item, tuple):
+            response_part = item[0] or b""
+            payload = item[1] or b""
+            uid_match = re.search(rb"UID\s+(?P<uid>\d+)", response_part, re.IGNORECASE)
+            if uid_match:
+                uid = decode_bytes(uid_match.group("uid"))
+                flags = parse_flags(response_part)
+                results.append((uid, payload, flags))
+    return results
 
 
 def list_messages(folder: str) -> list[dict]:
@@ -332,17 +349,24 @@ def list_messages(folder: str) -> list[dict]:
         selected_uids = list(reversed(uids))[:MAX_MESSAGE_LIST_SIZE]
         messages = []
 
-        for raw_uid in selected_uids:
-            uid = decode_bytes(raw_uid)
+        if selected_uids:
+            # Batch fetch all headers in a single request instead of looping
+            # This prevents N+1 IMAP query problem
+            uid_sequence = b",".join(selected_uids).decode("ascii")
             status, fetch_data = client.uid(
                 "FETCH",
-                uid,
+                uid_sequence,
                 "(BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)] FLAGS)",
             )
-            if status != "OK":
-                continue
-            raw_headers, flags = extract_payload(fetch_data)
-            messages.append(message_summary_from_headers(uid, raw_headers, flags))
+            if status == "OK":
+                uid_order = {decode_bytes(u): i for i, u in enumerate(selected_uids)}
+                fetched = []
+                for uid, raw_headers, flags in extract_batched_payloads(fetch_data):
+                    fetched.append(
+                        message_summary_from_headers(uid, raw_headers, flags)
+                    )
+                # Sort fetched messages to match the order of selected_uids (descending by default)
+                messages = sorted(fetched, key=lambda m: uid_order.get(m["uid"], 9999))
 
         return messages
     finally:
