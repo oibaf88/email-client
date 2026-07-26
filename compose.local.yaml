@@ -6,6 +6,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
+      APP_ENV: development
       SESSION_COOKIE_SECURE: "false"
       SSL_CERT_FILE: /certs/fullchain.pem
     volumes:

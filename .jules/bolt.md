@@ -1,3 +1,0 @@
-## 2024-07-22 - Batching IMAP FETCH for Performance
-**Learning:** Found an N+1 query problem where `app.py` was issuing a separate `FETCH` command for every single message when listing a folder (up to 50 roundtrips per page). IMAP supports batching multiple UIDs in a single command, but the response order isn't guaranteed and requires parsing the `UID` from each response part to reassociate it with the original order.
-**Action:** Always batch IMAP commands when working with multiple UIDs by joining them with commas (e.g., `UID FETCH 1,2,3...`). Parse the `UID` from the response (using regex like `UID \d+`) to map the results back to the original requested order.

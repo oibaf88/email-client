@@ -20,6 +20,8 @@ services:
     env_file:
       - .env
     environment:
+      APP_MODE: live
+      APP_ENV: production
       IMAP_HOST: ${MAIL_FQDN}
       IMAP_PORT: 993
       SMTP_HOST: ${MAIL_FQDN}
