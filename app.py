@@ -26,6 +26,7 @@ load_dotenv()
 VALID_APP_MODES = {"showcase", "live"}
 APP_MODE = os.getenv("APP_MODE", "showcase").strip().lower()
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+APP_RELEASE = os.getenv("APP_RELEASE", "1.2.0").strip() or "1.2.0"
 IS_PRODUCTION = APP_ENV == "production"
 
 if APP_MODE not in VALID_APP_MODES:
@@ -759,6 +760,7 @@ def public_state() -> dict:
     user = session.get("mail_user")
     return {
         "mode": APP_MODE,
+        "release": APP_RELEASE,
         "authenticated": is_authenticated(),
         "user": user,
         "domain": "demo.invalid" if APP_MODE == "showcase" else MAIL_DOMAIN,
@@ -775,14 +777,21 @@ def home():
 
 @app.get("/healthz")
 def healthz():
-    return jsonify({"status": "alive", "mode": APP_MODE})
+    return jsonify({"status": "alive", "mode": APP_MODE, "release": APP_RELEASE})
 
 
 @app.get("/readyz")
 def readyz():
     issues = runtime_config_issues()
     return (
-        jsonify({"status": "ready" if not issues else "not_ready", "mode": APP_MODE, "issues": issues}),
+        jsonify(
+            {
+                "status": "ready" if not issues else "not_ready",
+                "mode": APP_MODE,
+                "release": APP_RELEASE,
+                "issues": issues,
+            }
+        ),
         200 if not issues else 503,
     )
 
