@@ -49,7 +49,7 @@ Supabase is not used by v1.2.0. Historical database experiments are intentionall
 ### Local run
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.14 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 $env:APP_MODE = "showcase"
