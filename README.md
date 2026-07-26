@@ -20,7 +20,7 @@ The repository also contains an optional Docker Mailserver appliance for a priva
 - CSRF protection on every write, including login.
 - Request, recipient, subject, body, password and UID limits.
 - CSP nonce, HSTS, anti-framing and other browser security headers.
-- Separate `/healthz` liveness and `/readyz` readiness probes.
+- Versioned `/healthz` liveness and `/readyz` readiness probes.
 - Pytest and Ruff checks in GitHub Actions.
 
 See [CHANGELOG.md](CHANGELOG.md) for the project history.
@@ -127,8 +127,8 @@ Follow [docs/mail-server-setup.md](docs/mail-server-setup.md). Treat that stack 
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/healthz` | Process liveness; no dependency check |
-| `GET` | `/readyz` | Configuration readiness |
+| `GET` | `/healthz` | Process liveness and deployed release |
+| `GET` | `/readyz` | Configuration readiness and deployed release |
 | `GET` | `/api/state` | Mode, authentication and CSRF state |
 | `POST` | `/api/login` | Live-mode login only |
 | `POST` | `/api/logout` | Rotate and clear the live session |
