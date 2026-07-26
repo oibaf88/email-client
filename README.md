@@ -164,7 +164,7 @@ See [SECURITY.md](SECURITY.md) for supported versions, disclosure and residual r
 pip install -r requirements-dev.txt
 ruff check .
 python -m compileall app.py tests
-pytest -q
+python -m pytest -q
 ```
 
 The test suite verifies the isolated showcase, simulated mail operations, CSRF, validation limits, health probes, browser headers and live session rotation without contacting a mail server.
