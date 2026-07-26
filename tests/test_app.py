@@ -29,6 +29,7 @@ def test_showcase_is_automatic_and_explicit(client):
     state = get_state(client)
 
     assert state["mode"] == "showcase"
+    assert state["release"] == "1.2.0"
     assert state["authenticated"] is True
     assert state["simulated"] is True
     assert state["network_access"] is False
@@ -178,9 +179,10 @@ def test_health_and_security_headers(client):
     page = client.get("/")
 
     assert live.status_code == 200
-    assert live.get_json() == {"mode": "showcase", "status": "alive"}
+    assert live.get_json() == {"mode": "showcase", "release": "1.2.0", "status": "alive"}
     assert ready.status_code == 200
     assert ready.get_json()["status"] == "ready"
+    assert ready.get_json()["release"] == "1.2.0"
     assert page.headers["Cache-Control"] == "no-store"
     assert page.headers["X-Content-Type-Options"] == "nosniff"
     assert page.headers["X-Frame-Options"] == "DENY"
