@@ -12,6 +12,8 @@ services:
         value: showcase
       - key: APP_ENV
         value: production
+      - key: APP_RELEASE
+        value: "1.2.0"
       - key: SESSION_COOKIE_SECURE
         value: "true"
       - key: SESSION_TTL_SECONDS
