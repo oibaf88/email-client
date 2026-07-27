@@ -1,0 +1,54 @@
+name: Production smoke audit
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify Render showcase
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://email-client-1gs6.onrender.com"
+          root="$(mktemp)"
+          health="$(mktemp)"
+          ready="$(mktemp)"
+          state="$(mktemp)"
+          headers="$(mktemp)"
+          cookies="$(mktemp)"
+
+          for attempt in {1..24}; do
+            if curl --fail --silent --show-error --location --max-time 30 --cookie-jar "$cookies" --dump-header "$headers" "$base/" -o "$root" \
+              && grep --fixed-strings --quiet "<title>BFAB Mail Lab</title>" "$root" \
+              && grep --ignore-case --quiet '^x-frame-options: DENY' "$headers" \
+              && grep --ignore-case --quiet '^content-security-policy:' "$headers" \
+              && curl --fail --silent --show-error --location --max-time 30 "$base/healthz" -o "$health" \
+              && grep --fixed-strings --quiet '"mode":"showcase"' "$health" \
+              && grep --fixed-strings --quiet '"release":"1.2.0"' "$health" \
+              && curl --fail --silent --show-error --location --max-time 30 "$base/readyz" -o "$ready" \
+              && grep --fixed-strings --quiet '"status":"ready"' "$ready" \
+              && curl --fail --silent --show-error --location --max-time 30 --cookie "$cookies" "$base/api/state" -o "$state" \
+              && grep --fixed-strings --quiet '"simulated":true' "$state" \
+              && grep --fixed-strings --quiet '"network_access":false' "$state"; then
+              echo "PASS Render showcase root, headers, health, readiness and isolated state"
+              cat "$health"
+              cat "$ready"
+              cat "$state"
+              exit 0
+            fi
+            echo "WAIT Render showcase attempt $attempt/24"
+            sleep 10
+          done
+
+          echo "FAIL Render endpoint did not expose the v1.2.0 isolated showcase"
+          head -c 500 "$root" || true
+          cat "$health" || true
+          cat "$ready" || true
+          cat "$state" || true
+          exit 1
