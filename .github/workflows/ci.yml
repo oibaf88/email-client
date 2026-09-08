@@ -49,6 +49,8 @@ jobs:
 
       - name: Build and smoke-test local container
         run: |
+          export LOCAL_UID="$(id -u)"
+          export LOCAL_GID="$(id -g)"
           docker compose up -d --build
           for attempt in {1..20}; do
             if curl --fail --silent http://127.0.0.1:8000/readyz; then
