@@ -2,54 +2,53 @@
 
 ## Supported runtime
 
-BFAB Local Mail v2 is supported only as a local application bound to loopback (`127.0.0.1`).
+BFAB Local Mail v2.1 is supported as a localhost application bound to `127.0.0.1`.
 
-The project has no public deployment mode, mail-server mode, account system, IMAP/SMTP integration, or cloud database integration.
+It is not a public web service and it does not host an SMTP/IMAP server. It connects as a client to the existing IMAP/SMTP provider explicitly configured by the local user.
 
-## Trust boundary
+## Secrets
 
-The local computer account is the trust boundary. Anyone who can read the repository's `data/email-client.db` file can read the locally stored messages.
+The SQLite database stores non-secret server configuration only. Mailbox passwords are not stored in SQLite or `.env`.
 
-SQLite is not encrypted by this application.
+After successful IMAP authentication, the password is retained only in a Flask server-side filesystem session so subsequent IMAP/SMTP requests can authenticate. The browser cookie contains the opaque/signed session identifier, not the mailbox password.
 
-For sensitive data, rely on operating-system protections such as:
+Sign out when finished. With the default random Flask secret, a process restart invalidates the previous browser session.
 
-- a password-protected Windows account;
-- BitLocker/device encryption;
-- normal filesystem permissions;
-- encrypted backups.
+## Local database
 
-## Network exposure
+`data/email-client.db` is ordinary, unencrypted SQLite. It contains server settings but not mailbox message bodies or mailbox credentials.
 
-`compose.yaml` publishes port 8000 only on `127.0.0.1`.
+Use normal operating-system protections such as account passwords, BitLocker/device encryption, filesystem permissions and encrypted backups.
 
-Do not change that to `0.0.0.0` or expose the application directly to the public Internet unless you also design and implement proper authentication, HTTPS, rate limiting, deployment secrets, and a reviewed threat model.
+## Network boundary
 
-## Application controls
+`compose.yaml` publishes the web UI only to `127.0.0.1:8000`.
 
-The application includes:
+Do not change this to a public/LAN bind without adding a reviewed authentication/deployment threat model and HTTPS.
 
-- CSRF protection for write requests;
-- request and field-size limits;
-- SQLite parameterized queries;
-- restrictive browser security headers;
-- no remote mail credentials;
-- no external mail transport;
-- no cloud runtime secrets.
+Outbound mail-client traffic is expected:
 
-## Database handling
+- IMAP over TLS;
+- SMTP implicit TLS on 465 or STARTTLS on other configured ports.
 
-The SQLite database and WAL/SHM sidecar files are ignored by Git.
+TLS certificate validation is enabled and the client requires TLS 1.2 or later.
+
+## Limitations
+
+- Password/app-password IMAP/SMTP authentication is supported; OAuth 2.0 is not yet implemented.
+- Attachments are listed but not downloadable through the UI.
+- Delete uses the IMAP `\\Deleted` flag plus expunge in the currently selected folder; provider-specific Trash semantics can differ.
+- This is a personal/local client, not a multi-user service.
+
+## Repository hygiene
 
 Do not commit:
 
-- `data/email-client.db`
-- `data/email-client.db-wal`
-- `data/email-client.db-shm`
-- `.env`
-
-Stop the application before editing the database manually with DB Browser for SQLite.
+- `.env`;
+- `data/email-client.db` or SQLite WAL/SHM files;
+- mailbox passwords/app-passwords;
+- copied mail content containing sensitive data.
 
 ## Reporting
 
-If you discover a security problem, avoid publishing real mailbox contents, secrets, local paths containing personal information, or other sensitive data in a public issue.
+Do not post real credentials, private mail contents, or personally identifying local paths in public issues.

@@ -3,18 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A local-only webmail-style application backed by SQLite.">
+  <meta name="description" content="A localhost-only IMAP/SMTP email client with local SQLite configuration.">
   <title>BFAB Local Mail</title>
-  <style>
+  <style nonce="{{ csp_nonce }}">
     :root {
       color-scheme: dark;
-      --bg: #081013;
+      --bg: #071014;
       --panel: #102126;
-      --panel2: #0c191d;
-      --line: #244047;
+      --panel2: #0b191d;
+      --line: rgba(174, 224, 213, .16);
       --text: #eef8f5;
       --muted: #9eb6b0;
       --accent: #68e0b5;
+      --amber: #ffc66d;
       --danger: #ff9299;
     }
     * { box-sizing: border-box; }
@@ -36,30 +37,30 @@
       letter-spacing: .03em;
     }
     .app {
-      width: min(1450px, calc(100% - 2rem));
+      width: min(1500px, calc(100% - 2rem));
       height: calc(100vh - 70px);
       margin: 1rem auto;
       display: grid;
-      grid-template-columns: 250px 390px 1fr;
+      grid-template-columns: 260px 410px 1fr;
       overflow: hidden;
       border: 1px solid var(--line);
       border-radius: 20px;
-      background: rgba(8, 16, 19, .9);
+      background: rgba(8, 16, 19, .92);
     }
     .sidebar, .messages { border-right: 1px solid var(--line); }
     .sidebar { display: flex; flex-direction: column; padding: 1.2rem; background: var(--panel2); }
     h1 { margin: 0; font-size: 1.1rem; }
     .subtitle { margin: .3rem 0 1.2rem; color: var(--muted); font-size: .78rem; }
-    .compose {
-      width: 100%;
-      padding: .8rem;
-      border: 0;
-      border-radius: 11px;
-      background: var(--accent);
-      color: #062119;
-      font-weight: 800;
+    .primary, .secondary, .danger {
+      padding: .68rem .82rem;
+      border-radius: 10px;
+      font-weight: 700;
     }
-    .folder-list { display: grid; gap: .35rem; margin-top: 1rem; }
+    .primary { border: 0; background: var(--accent); color: #062119; }
+    .secondary { border: 1px solid var(--line); background: #13262b; color: var(--text); }
+    .danger { border: 1px solid var(--line); background: #25171a; color: var(--danger); }
+    .full { width: 100%; }
+    .folder-list { display: grid; gap: .35rem; margin: 1rem 0; overflow: auto; }
     .folder {
       display: flex;
       justify-content: space-between;
@@ -72,7 +73,7 @@
       text-align: left;
     }
     .folder.active, .folder:hover { border-color: var(--line); background: #13282e; color: var(--text); }
-    .local-card {
+    .account-card {
       margin-top: auto;
       padding: .9rem;
       border: 1px solid var(--line);
@@ -81,6 +82,8 @@
       font-size: .76rem;
       line-height: 1.5;
     }
+    .account-card strong { color: var(--text); overflow-wrap: anywhere; }
+    .account-actions { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .7rem; }
     .messages, .reader { min-height: 0; display: flex; flex-direction: column; }
     .header { padding: 1rem 1.1rem; border-bottom: 1px solid var(--line); }
     .header h2 { margin: 0; font-size: 1rem; }
@@ -98,20 +101,13 @@
     }
     .message:hover, .message.selected { border-color: var(--line); background: #122329; }
     .message.unread { color: var(--text); background: #102820; }
-    .message .top { display: flex; justify-content: space-between; gap: .6rem; font-size: .75rem; }
+    .message .top { display: flex; justify-content: space-between; gap: .6rem; font-size: .73rem; }
     .message .subject { margin-top: .35rem; color: var(--text); font-weight: 700; }
     .reader-body { padding: 1.4rem; overflow: auto; }
     .reader-body pre { white-space: pre-wrap; font: inherit; line-height: 1.65; color: #dbe9e5; }
     .meta { color: var(--muted); font-size: .78rem; line-height: 1.55; }
+    .notice { margin: .8rem 0; padding: .7rem; border-left: 3px solid var(--amber); background: #2b2515; color: #ffe3aa; }
     .actions { display: flex; gap: .5rem; margin-top: 1rem; }
-    .secondary, .danger {
-      padding: .6rem .8rem;
-      border: 1px solid var(--line);
-      border-radius: 9px;
-      background: #13262b;
-      color: var(--text);
-    }
-    .danger { color: var(--danger); }
     .empty { padding: 2rem; color: var(--muted); text-align: center; }
     dialog {
       width: min(620px, calc(100% - 2rem));
@@ -132,98 +128,146 @@
       color: var(--text);
     }
     textarea { min-height: 180px; resize: vertical; }
+    .grid2 { display: grid; grid-template-columns: 1fr 130px; gap: .65rem; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; }
     #toast {
       position: fixed;
       right: 1rem;
       bottom: 1rem;
-      max-width: 420px;
+      max-width: 430px;
       padding: .8rem 1rem;
       border: 1px solid var(--line);
       border-radius: 10px;
       background: #153229;
       box-shadow: 0 14px 50px #0008;
+      z-index: 30;
     }
     #toast.error { background: #3a1d21; }
     [hidden] { display: none !important; }
-    @media (max-width: 1000px) {
-      .app { grid-template-columns: 220px 1fr; }
+    @media (max-width: 1050px) {
+      .app { grid-template-columns: 230px 1fr; }
       .reader { position: fixed; inset: 62px 1rem 1rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel2); }
       .reader.mobile-hidden { display: none; }
     }
-    @media (max-width: 680px) {
+    @media (max-width: 700px) {
       .app { width: calc(100% - 1rem); margin: .5rem; grid-template-columns: 1fr; height: auto; min-height: calc(100vh - 56px); }
       .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
-      .folder-list { grid-template-columns: repeat(3, 1fr); }
       .messages { border-right: 0; min-height: 50vh; }
+      .grid2 { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <div class="banner">LOCAL ONLY · SQLite storage · no external mail or cloud services</div>
+  <div class="banner">LOCAL RUNTIME · SQLite settings · real IMAP/SMTP mail</div>
 
   <main class="app">
     <aside class="sidebar">
       <h1>BFAB Local Mail</h1>
-      <p class="subtitle">Release {{ release }}</p>
-      <button class="compose" id="composeButton">Compose local message</button>
+      <p class="subtitle">v{{ release }} · localhost only</p>
+      <button class="primary full" id="composeButton" disabled>Compose</button>
       <div class="folder-list" id="folderList"></div>
-      <div class="local-card">
-        <strong id="localUser">local mailbox</strong><br>
-        Stored in SQLite on this computer.<br><br>
-        <button class="secondary" id="resetButton">Reset sample data</button>
+      <div class="account-card">
+        <strong id="accountStatus">Not configured</strong>
+        <div id="serverSummary">Mail server settings are stored in local SQLite. Your mailbox password is not.</div>
+        <div class="account-actions">
+          <button class="secondary" id="configureButton">Configure</button>
+          <button class="secondary" id="loginButton">Sign in</button>
+          <button class="danger" id="logoutButton" hidden>Sign out</button>
+        </div>
       </div>
     </aside>
 
     <section class="messages">
       <header class="header">
-        <h2 id="folderTitle">INBOX</h2>
-        <p id="messageCount">Loading…</p>
+        <h2 id="folderTitle">Mailbox</h2>
+        <p id="messageCount">Configure and sign in to your existing mailbox.</p>
       </header>
-      <div id="messageList"></div>
+      <div id="messageList"><div class="empty">No mailbox session yet.</div></div>
     </section>
 
     <section class="reader mobile-hidden" id="reader">
       <header class="header">
         <h2 id="readerTitle">Select a message</h2>
-        <p id="readerSubtitle">Messages never leave this computer.</p>
+        <p id="readerSubtitle">Message content is fetched from your IMAP server.</p>
       </header>
-      <div class="reader-body" id="readerBody">
-        <div class="empty">Choose a message from the list.</div>
-      </div>
+      <div class="reader-body" id="readerBody"><div class="empty">Choose a message.</div></div>
     </section>
   </main>
 
+  <dialog id="configDialog">
+    <form id="configForm">
+      <h2>Mail server configuration</h2>
+      <p class="meta">These non-secret settings are saved to <code>data/email-client.db</code>. The password is never written to SQLite.</p>
+      <label>Mail domain (optional)
+        <input id="mailDomain" placeholder="example.com">
+      </label>
+      <div class="grid2">
+        <label>IMAP host
+          <input id="imapHost" placeholder="imap.example.com" required>
+        </label>
+        <label>IMAP port
+          <input id="imapPort" type="number" min="1" max="65535" value="993" required>
+        </label>
+      </div>
+      <div class="grid2">
+        <label>SMTP host
+          <input id="smtpHost" placeholder="smtp.example.com" required>
+        </label>
+        <label>SMTP port
+          <input id="smtpPort" type="number" min="1" max="65535" value="587" required>
+        </label>
+      </div>
+      <label>Fallback Sent folder
+        <input id="sentFolder" value="Sent" maxlength="160">
+      </label>
+      <p class="meta">IMAP uses TLS. SMTP port 465 uses implicit TLS; other ports must advertise STARTTLS.</p>
+      <div class="dialog-actions">
+        <button class="secondary" type="button" data-close="configDialog">Cancel</button>
+        <button class="primary" type="submit">Save locally</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="loginDialog">
+    <form id="loginForm">
+      <h2>Sign in to mailbox</h2>
+      <label>Email address
+        <input id="loginEmail" type="email" autocomplete="username" required>
+      </label>
+      <label>Password / app password
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="meta">The credential is kept only in the local server-side session and is cleared on sign-out. It is not stored in SQLite or JavaScript.</p>
+      <div class="dialog-actions">
+        <button class="secondary" type="button" data-close="loginDialog">Cancel</button>
+        <button class="primary" type="submit">Sign in</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="composeDialog">
     <form id="composeForm">
-      <h2>Compose local message</h2>
+      <h2>Compose email</h2>
       <label>To
-        <input id="composeTo" type="text" placeholder="someone@example.invalid" required>
+        <input id="composeTo" type="text" placeholder="recipient@example.com" required>
       </label>
       <label>Subject
-        <input id="composeSubject" type="text" maxlength="200">
+        <input id="composeSubject" maxlength="200" required>
       </label>
       <label>Body
-        <textarea id="composeBody" maxlength="20000"></textarea>
+        <textarea id="composeBody" maxlength="20000" required></textarea>
       </label>
-      <p class="meta">Send stores the message in the local Sent folder. It does not use SMTP and does not deliver email to the Internet.</p>
       <div class="dialog-actions">
-        <button class="secondary" type="button" id="cancelCompose">Cancel</button>
-        <button class="compose" type="submit">Store in Sent</button>
+        <button class="secondary" type="button" data-close="composeDialog">Cancel</button>
+        <button class="primary" type="submit">Send through SMTP</button>
       </div>
     </form>
   </dialog>
 
   <div id="toast" hidden></div>
 
-  <script>
-    const state = {
-      csrf: "",
-      folder: "INBOX",
-      selectedUid: null,
-      folders: []
-    };
-
+  <script nonce="{{ csp_nonce }}">
+    const state = {csrf: "", configured: false, authenticated: false, user: null, config: null, folder: "INBOX", selectedUid: null};
     const folderList = document.getElementById("folderList");
     const messageList = document.getElementById("messageList");
     const folderTitle = document.getElementById("folderTitle");
@@ -233,13 +277,15 @@
     const readerSubtitle = document.getElementById("readerSubtitle");
     const readerBody = document.getElementById("readerBody");
     const toast = document.getElementById("toast");
-    const dialog = document.getElementById("composeDialog");
+    const configDialog = document.getElementById("configDialog");
+    const loginDialog = document.getElementById("loginDialog");
+    const composeDialog = document.getElementById("composeDialog");
 
     function showToast(message, error = false) {
       toast.textContent = message;
       toast.className = error ? "error" : "";
       toast.hidden = false;
-      window.setTimeout(() => { toast.hidden = true; }, 3500);
+      window.setTimeout(() => { toast.hidden = true; }, 4000);
     }
 
     async function api(path, options = {}) {
@@ -248,11 +294,11 @@
       if (options.method && options.method !== "GET") headers.set("X-CSRF-Token", state.csrf);
       const response = await fetch(path, {...options, headers});
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+      if (!response.ok) throw new Error(data.error || data.message || `Request failed (${response.status})`);
       return data;
     }
 
-    function escapeHtml(value) {
+    function esc(value) {
       return String(value ?? "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
@@ -261,149 +307,192 @@
         .replaceAll("'", "&#039;");
     }
 
+    function renderAccount() {
+      const status = document.getElementById("accountStatus");
+      const summary = document.getElementById("serverSummary");
+      const loginButton = document.getElementById("loginButton");
+      const logoutButton = document.getElementById("logoutButton");
+      const composeButton = document.getElementById("composeButton");
+      if (!state.configured) {
+        status.textContent = "Not configured";
+        summary.textContent = "Configure your existing IMAP/SMTP mailbox. Settings stay in local SQLite.";
+      } else if (!state.authenticated) {
+        status.textContent = "Configured · signed out";
+        summary.textContent = `${state.config.imap_host}:${state.config.imap_port} · ${state.config.smtp_host}:${state.config.smtp_port}`;
+      } else {
+        status.textContent = state.user;
+        summary.textContent = `${state.config.imap_host} · ${state.config.smtp_host}`;
+      }
+      loginButton.hidden = state.authenticated;
+      loginButton.disabled = !state.configured;
+      logoutButton.hidden = !state.authenticated;
+      composeButton.disabled = !state.authenticated;
+    }
+
     async function loadState() {
       const data = await api("/api/state");
       state.csrf = data.csrf_token;
-      document.getElementById("localUser").textContent = data.user;
+      state.configured = data.configured;
+      state.authenticated = data.authenticated;
+      state.user = data.user;
+      state.config = data.config;
+      renderAccount();
+      if (state.authenticated) await loadFolders();
+      else {
+        folderList.innerHTML = "";
+        messageList.innerHTML = '<div class="empty">Configure and sign in to your mailbox.</div>';
+      }
     }
 
     async function loadFolders() {
       const data = await api("/api/folders");
-      state.folders = data.folders;
+      if (!data.folders.length) return;
+      if (!data.folders.some(folder => folder.name === state.folder)) state.folder = data.folders[0].name;
       folderList.innerHTML = data.folders.map(folder => `
-        <button class="folder ${folder.name === state.folder ? "active" : ""}" data-folder="${escapeHtml(folder.name)}">
-          <span>${escapeHtml(folder.name)}</span><span>${folder.count}</span>
+        <button class="folder ${folder.name === state.folder ? "active" : ""}" data-folder="${esc(folder.name)}">
+          <span>${esc(folder.display_name || folder.name)}</span><span>${esc(folder.role || "")}</span>
         </button>
       `).join("");
-      folderList.querySelectorAll(".folder").forEach(button => {
-        button.addEventListener("click", () => selectFolder(button.dataset.folder));
-      });
-    }
-
-    async function loadMessages() {
-      folderTitle.textContent = state.folder;
-      const data = await api(`/api/messages?folder=${encodeURIComponent(state.folder)}`);
-      messageCount.textContent = `${data.messages.length} message${data.messages.length === 1 ? "" : "s"}`;
-      if (!data.messages.length) {
-        messageList.innerHTML = '<div class="empty">No messages in this folder.</div>';
-        clearReader();
-        return;
-      }
-      messageList.innerHTML = data.messages.map(message => `
-        <button class="message ${message.read ? "" : "unread"} ${message.uid === state.selectedUid ? "selected" : ""}" data-uid="${message.uid}">
-          <div class="top">
-            <span>${escapeHtml(state.folder === "Sent" ? message.to : message.from)}</span>
-            <span>${escapeHtml(new Date(message.date).toLocaleString())}</span>
-          </div>
-          <div class="subject">${escapeHtml(message.subject || "(no subject)")}</div>
-        </button>
-      `).join("");
-      messageList.querySelectorAll(".message").forEach(button => {
-        button.addEventListener("click", () => openMessage(button.dataset.uid));
-      });
-    }
-
-    function clearReader() {
-      state.selectedUid = null;
-      readerTitle.textContent = "Select a message";
-      readerSubtitle.textContent = "Messages never leave this computer.";
-      readerBody.innerHTML = '<div class="empty">Choose a message from the list.</div>';
-      reader.classList.add("mobile-hidden");
+      folderList.querySelectorAll(".folder").forEach(button => button.addEventListener("click", () => selectFolder(button.dataset.folder)));
+      await loadMessages();
     }
 
     async function selectFolder(folder) {
       state.folder = folder;
+      state.selectedUid = null;
       clearReader();
       await loadFolders();
-      await loadMessages();
+    }
+
+    async function loadMessages() {
+      folderTitle.textContent = state.folder;
+      messageCount.textContent = "Loading from IMAP…";
+      const data = await api(`/api/messages?folder=${encodeURIComponent(state.folder)}`);
+      messageCount.textContent = `${data.messages.length} recent message${data.messages.length === 1 ? "" : "s"}`;
+      if (!data.messages.length) {
+        messageList.innerHTML = '<div class="empty">No messages in this folder.</div>';
+        return;
+      }
+      messageList.innerHTML = data.messages.map(message => `
+        <button class="message ${message.is_read ? "" : "unread"} ${message.uid === state.selectedUid ? "selected" : ""}" data-uid="${message.uid}">
+          <div class="top"><span>${esc(message.from || message.to)}</span><span>${esc(message.date)}</span></div>
+          <div class="subject">${esc(message.subject)}</div>
+        </button>
+      `).join("");
+      messageList.querySelectorAll(".message").forEach(button => button.addEventListener("click", () => openMessage(button.dataset.uid)));
+    }
+
+    function clearReader() {
+      readerTitle.textContent = "Select a message";
+      readerSubtitle.textContent = "Message content is fetched from your IMAP server.";
+      readerBody.innerHTML = '<div class="empty">Choose a message.</div>';
+      reader.classList.add("mobile-hidden");
     }
 
     async function openMessage(uid) {
       const data = await api(`/api/messages/${uid}?folder=${encodeURIComponent(state.folder)}`);
       const message = data.message;
       state.selectedUid = uid;
-      readerTitle.textContent = message.subject || "(no subject)";
+      readerTitle.textContent = message.subject;
       readerSubtitle.textContent = `${message.from} → ${message.to}`;
+      const truncated = message.truncated ? '<div class="notice">Preview truncated by the local safety limit.</div>' : "";
+      const attachments = message.attachments?.length ? `<div class="notice">Attachments: ${message.attachments.map(a => esc(a.filename || a.content_type)).join(", ")}. Download is not implemented.</div>` : "";
       readerBody.innerHTML = `
-        <div class="meta">
-          <strong>From:</strong> ${escapeHtml(message.from)}<br>
-          <strong>To:</strong> ${escapeHtml(message.to)}<br>
-          <strong>Date:</strong> ${escapeHtml(new Date(message.date).toLocaleString())}
-        </div>
-        <pre>${escapeHtml(message.body)}</pre>
-        <div class="actions">
-          <button class="secondary" id="readToggle">${message.read ? "Mark unread" : "Mark read"}</button>
-          <button class="danger" id="deleteMessage">${state.folder === "Trash" ? "Delete permanently" : "Move to Trash"}</button>
-        </div>
-      `;
+        <div class="meta"><strong>From:</strong> ${esc(message.from)}<br><strong>To:</strong> ${esc(message.to)}<br><strong>Date:</strong> ${esc(message.date)}</div>
+        ${truncated}${attachments}<pre>${esc(message.body)}</pre>
+        <div class="actions"><button class="secondary" id="readToggle">${message.is_read ? "Mark unread" : "Mark read"}</button><button class="danger" id="deleteMessage">Delete from server</button></div>`;
       reader.classList.remove("mobile-hidden");
-      document.getElementById("readToggle").addEventListener("click", () => setRead(uid, !message.read));
+      document.getElementById("readToggle").addEventListener("click", () => setRead(uid, !message.is_read));
       document.getElementById("deleteMessage").addEventListener("click", () => deleteMessage(uid));
       await loadMessages();
     }
 
     async function setRead(uid, read) {
-      await api(`/api/messages/${uid}/read?folder=${encodeURIComponent(state.folder)}`, {
-        method: "POST",
-        body: JSON.stringify({read})
-      });
+      await api(`/api/messages/${uid}/read?folder=${encodeURIComponent(state.folder)}`, {method: "POST", body: JSON.stringify({read})});
       await openMessage(uid);
-      await loadFolders();
     }
 
     async function deleteMessage(uid) {
+      if (!window.confirm("Delete this message from the current server folder?")) return;
       await api(`/api/messages/${uid}?folder=${encodeURIComponent(state.folder)}`, {method: "DELETE"});
-      showToast(state.folder === "Trash" ? "Message deleted." : "Message moved to Trash.");
+      state.selectedUid = null;
       clearReader();
-      await loadFolders();
+      showToast("Message deleted on the IMAP server.");
       await loadMessages();
     }
 
-    document.getElementById("composeButton").addEventListener("click", () => dialog.showModal());
-    document.getElementById("cancelCompose").addEventListener("click", () => dialog.close());
+    document.getElementById("configureButton").addEventListener("click", () => {
+      const config = state.config || {};
+      document.getElementById("mailDomain").value = config.mail_domain || "";
+      document.getElementById("imapHost").value = config.imap_host || "";
+      document.getElementById("imapPort").value = config.imap_port || 993;
+      document.getElementById("smtpHost").value = config.smtp_host || "";
+      document.getElementById("smtpPort").value = config.smtp_port || 587;
+      document.getElementById("sentFolder").value = config.sent_folder || "Sent";
+      configDialog.showModal();
+    });
 
+    document.getElementById("configForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        await api("/api/config", {method: "POST", body: JSON.stringify({
+          mail_domain: document.getElementById("mailDomain").value,
+          imap_host: document.getElementById("imapHost").value,
+          imap_port: Number(document.getElementById("imapPort").value),
+          smtp_host: document.getElementById("smtpHost").value,
+          smtp_port: Number(document.getElementById("smtpPort").value),
+          sent_folder: document.getElementById("sentFolder").value
+        })});
+        configDialog.close();
+        showToast("Mail configuration saved locally. Sign in next.");
+        await loadState();
+        loginDialog.showModal();
+      } catch (error) { showToast(error.message, true); }
+    });
+
+    document.getElementById("loginButton").addEventListener("click", () => loginDialog.showModal());
+    document.getElementById("loginForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        const data = await api("/api/login", {method: "POST", body: JSON.stringify({email: document.getElementById("loginEmail").value, password: document.getElementById("loginPassword").value})});
+        state.csrf = data.csrf_token;
+        event.target.reset();
+        loginDialog.close();
+        showToast("Signed in through IMAP.");
+        await loadState();
+      } catch (error) { showToast(error.message, true); }
+    });
+
+    document.getElementById("logoutButton").addEventListener("click", async () => {
+      try {
+        const data = await api("/api/logout", {method: "POST", body: JSON.stringify({})});
+        state.csrf = data.csrf_token;
+        state.folder = "INBOX";
+        clearReader();
+        showToast("Signed out. Local server settings were kept; password was cleared.");
+        await loadState();
+      } catch (error) { showToast(error.message, true); }
+    });
+
+    document.getElementById("composeButton").addEventListener("click", () => composeDialog.showModal());
     document.getElementById("composeForm").addEventListener("submit", async event => {
       event.preventDefault();
       try {
-        const result = await api("/api/send", {
-          method: "POST",
-          body: JSON.stringify({
-            to: document.getElementById("composeTo").value,
-            subject: document.getElementById("composeSubject").value,
-            body: document.getElementById("composeBody").value
-          })
-        });
+        const data = await api("/api/send", {method: "POST", body: JSON.stringify({to: document.getElementById("composeTo").value, subject: document.getElementById("composeSubject").value, body: document.getElementById("composeBody").value})});
         event.target.reset();
-        dialog.close();
-        showToast(result.warning);
+        composeDialog.close();
+        showToast(data.warning || "Email delivered through SMTP.");
         await loadFolders();
-        if (state.folder === "Sent") await loadMessages();
-      } catch (error) {
-        showToast(error.message, true);
-      }
+      } catch (error) { showToast(error.message, true); }
     });
 
-    document.getElementById("resetButton").addEventListener("click", async () => {
-      try {
-        await api("/api/reset", {method: "POST", body: JSON.stringify({})});
-        state.folder = "INBOX";
-        clearReader();
-        await loadFolders();
-        await loadMessages();
-        showToast("Local database reset to sample data.");
-      } catch (error) {
-        showToast(error.message, true);
-      }
-    });
+    document.querySelectorAll("[data-close]").forEach(button => button.addEventListener("click", () => document.getElementById(button.dataset.close).close()));
 
     (async () => {
       try {
         await loadState();
-        await loadFolders();
-        await loadMessages();
-      } catch (error) {
-        showToast(error.message, true);
-      }
+        if (!state.configured) configDialog.showModal();
+      } catch (error) { showToast(error.message, true); }
     })();
   </script>
 </body>
