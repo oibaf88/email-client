@@ -41,19 +41,19 @@ shift || true
 
 case "${command}" in
   list)
-    docker compose exec -T mailserver setup email list
+    docker compose -f compose.prod.yaml exec -T mailserver setup email list
     ;;
   add)
     require_mailbox "$@"
-    docker compose exec -T mailserver setup email add "$@"
+    docker compose -f compose.prod.yaml exec -T mailserver setup email add "$@"
     ;;
   update)
     require_mailbox "$@"
-    docker compose exec -T mailserver setup email update "$@"
+    docker compose -f compose.prod.yaml exec -T mailserver setup email update "$@"
     ;;
   delete|del|remove|rm)
     require_mailbox "$@"
-    docker compose exec -T mailserver setup email del "$@"
+    docker compose -f compose.prod.yaml exec -T mailserver setup email del "$@"
     ;;
   help|-h|--help|"")
     usage

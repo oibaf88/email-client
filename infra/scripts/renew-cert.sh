@@ -23,7 +23,7 @@ docker run --rm \
   --standalone
 
 cd "${ROOT_DIR}"
-docker compose exec -T mailserver supervisorctl restart postfix dovecot || docker compose restart mailserver
-docker compose restart caddy
+docker compose -f compose.prod.yaml exec -T mailserver supervisorctl restart postfix dovecot || docker compose -f compose.prod.yaml restart mailserver
+docker compose -f compose.prod.yaml restart caddy
 
 echo "Certificate renewal attempted. Check expiry with infra/scripts/check-mailserver.sh."
