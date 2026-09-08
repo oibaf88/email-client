@@ -41,7 +41,21 @@ docker compose version
 
 ## 3. Start the application
 
+### Windows / Docker Desktop
+
 ```powershell
+docker compose up --build
+```
+
+No UID/GID configuration is required on Windows.
+
+### Linux
+
+The container runs without root privileges. Export your host UID/GID so it can write the bind-mounted `data` directory:
+
+```bash
+export LOCAL_UID="$(id -u)"
+export LOCAL_GID="$(id -g)"
 docker compose up --build
 ```
 
@@ -258,10 +272,18 @@ Then open `http://127.0.0.1:8080`.
 
 Because `data/.gitkeep` creates the directory when the repository is cloned, this should normally work.
 
-If the directory was deleted, recreate it:
+On Windows, recreate a deleted directory with:
 
 ```powershell
 New-Item -ItemType Directory -Force .\data
+```
+
+On Linux, also export the host UID/GID before starting:
+
+```bash
+export LOCAL_UID="$(id -u)"
+export LOCAL_GID="$(id -g)"
+docker compose up -d
 ```
 
 ### Database is locked
