@@ -63,24 +63,24 @@ Showcase state is scoped to the server-side session and expires with it. All add
 
 ### Local Docker
 
-The repository includes a production-capable `Dockerfile` and a standalone `compose.local.yaml` for running only the safe showcase. The local Compose file deliberately does **not** start Redis, Docker Mailserver, Caddy, TLS, or any external mailbox connection.
+The repository includes a production-capable `Dockerfile`. The default `compose.yaml` runs only the safe local showcase and deliberately does **not** start Redis, Docker Mailserver, Caddy, TLS, or any external mailbox connection.
 
 The shortest path is:
 
 ```bash
-docker compose -f compose.local.yaml up --build
+docker compose up --build
 ```
 
 Then open `http://127.0.0.1:8000`. Check container health with:
 
 ```bash
-docker compose -f compose.local.yaml ps
+docker compose ps
 ```
 
 Stop and remove the local container with:
 
 ```bash
-docker compose -f compose.local.yaml down
+docker compose down
 ```
 
 You can also build and run the image without Compose:
@@ -138,13 +138,15 @@ Production startup fails if the Flask secret is weak or secure cookies are disab
 
 ### Docker application
 
+Production is intentionally explicit so a plain `docker compose up` can never start the mail appliance by accident:
+
 ```bash
-docker compose up -d --build
+docker compose -f compose.prod.yaml up -d --build
 curl --fail https://webmail.example.com/healthz
 curl --fail https://webmail.example.com/readyz
 ```
 
-`compose.yaml` explicitly selects live production mode and uses Redis-backed sessions.
+`compose.prod.yaml` selects live production mode and uses Redis-backed sessions. All VPS/mailserver helper scripts also target this file explicitly.
 
 ### Full mail appliance
 
@@ -210,8 +212,8 @@ The test suite verifies the isolated showcase, simulated mail operations, CSRF, 
 app.py                         Flask application and mode boundary
 templates/email_system.html    Responsive webmail UI
 Dockerfile                     Application image definition
-compose.local.yaml             Standalone local showcase container
-compose.yaml                   Private live mail appliance
+compose.yaml                   Default standalone local showcase
+compose.prod.yaml              Private live mail appliance
 render.yaml                    Public showcase deployment only
 infra/                         Mailserver, Caddy, DNS and bootstrap assets
 tests/                         API and security regression tests
