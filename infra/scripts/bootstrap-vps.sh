@@ -52,16 +52,16 @@ mkdir -p \
 
 cd "${ROOT_DIR}"
 
-docker compose pull
-docker compose up -d
+docker compose -f compose.prod.yaml pull
+docker compose -f compose.prod.yaml up -d
 
 if [[ -n "${FIRST_MAILBOX:-}" && -n "${FIRST_MAILBOX_PASSWORD:-}" ]]; then
   echo "Ensuring first mailbox exists: ${FIRST_MAILBOX}"
-  docker compose exec -T mailserver setup email add "${FIRST_MAILBOX}" "${FIRST_MAILBOX_PASSWORD}" || true
+  docker compose -f compose.prod.yaml exec -T mailserver setup email add "${FIRST_MAILBOX}" "${FIRST_MAILBOX_PASSWORD}" || true
 fi
 
 echo "Generating DKIM keys. Publish the resulting TXT record in DNS."
-docker compose exec -T mailserver setup config dkim
+docker compose -f compose.prod.yaml exec -T mailserver setup config dkim
 
 echo "Bootstrap complete."
 echo "Open https://${WEBMAIL_FQDN} after DNS and TLS checks pass."
