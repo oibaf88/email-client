@@ -1,7 +1,3 @@
-# Default local Docker configuration for the safe synthetic showcase.
-# It intentionally does not start Redis, Docker Mailserver, Caddy, or TLS.
-# For the full live production stack, use compose.prod.yaml explicitly.
-
 name: email-client-local
 
 services:
@@ -13,13 +9,14 @@ services:
     container_name: email-client-local
     init: true
     environment:
-      APP_MODE: showcase
-      APP_ENV: development
-      APP_RELEASE: local
-      SESSION_COOKIE_SECURE: "false"
-      SESSION_FILE_DIR: /tmp/email-client-sessions
+      APP_ENV: local
+      APP_RELEASE: "2.0.0"
+      DATABASE_PATH: /app/data/email-client.db
+      LOCAL_ADDRESS: local@localhost.invalid
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/app/data
     healthcheck:
       test:
         - CMD

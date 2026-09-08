@@ -3,762 +3,408 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A privacy-first synthetic webmail showcase and optional self-hosted IMAP/SMTP client.">
-  <title>BFAB Mail Lab</title>
-  <style nonce="{{ csp_nonce }}">
+  <meta name="description" content="A local-only webmail-style application backed by SQLite.">
+  <title>BFAB Local Mail</title>
+  <style>
     :root {
       color-scheme: dark;
-      --canvas: #071014;
-      --panel: rgba(12, 26, 31, 0.88);
-      --panel-strong: #10242a;
-      --line: rgba(168, 225, 210, 0.16);
-      --text: #f3fbf8;
-      --muted: #9fb7b0;
-      --mint: #62e6bc;
-      --mint-strong: #26bd90;
-      --cyan: #6ed5f1;
-      --amber: #ffc66d;
-      --danger: #ff8c91;
-      --shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+      --bg: #081013;
+      --panel: #102126;
+      --panel2: #0c191d;
+      --line: #244047;
+      --text: #eef8f5;
+      --muted: #9eb6b0;
+      --accent: #68e0b5;
+      --danger: #ff9299;
     }
-
     * { box-sizing: border-box; }
-
-    html { min-width: 320px; background: var(--canvas); }
-
     body {
-      min-height: 100vh;
       margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top left, #12332d 0, transparent 34rem), var(--bg);
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at 12% 8%, rgba(38, 189, 144, 0.18), transparent 34rem),
-        radial-gradient(circle at 92% 88%, rgba(110, 213, 241, 0.13), transparent 30rem),
-        linear-gradient(145deg, #071014 0%, #09181b 52%, #071014 100%);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
     }
-
     button, input, textarea { font: inherit; }
-
-    button { color: inherit; }
-
-    button:focus-visible, input:focus-visible, textarea:focus-visible {
-      outline: 3px solid rgba(110, 213, 241, 0.7);
-      outline-offset: 2px;
-    }
-
-    .mode-banner {
-      display: flex;
-      justify-content: center;
-      gap: 0.65rem;
-      align-items: center;
-      min-height: 42px;
-      padding: 0.65rem 1rem;
-      color: #082018;
-      background: linear-gradient(90deg, var(--mint), #a7f3d7);
-      font-size: 0.82rem;
-      font-weight: 800;
-      letter-spacing: 0.035em;
+    button { cursor: pointer; }
+    .banner {
+      padding: .7rem 1rem;
+      background: var(--accent);
+      color: #062119;
       text-align: center;
+      font-weight: 800;
+      letter-spacing: .03em;
     }
-
-    .mode-banner.live {
-      color: #251700;
-      background: linear-gradient(90deg, var(--amber), #ffe3aa);
-    }
-
-    .dot {
-      width: 0.65rem;
-      height: 0.65rem;
-      border-radius: 999px;
-      background: currentColor;
-      box-shadow: 0 0 0 5px rgba(8, 32, 24, 0.1);
-    }
-
     .app {
-      width: min(1500px, calc(100% - 2rem));
-      min-height: calc(100vh - 74px);
+      width: min(1450px, calc(100% - 2rem));
+      height: calc(100vh - 70px);
       margin: 1rem auto;
       display: grid;
-      grid-template-columns: 270px minmax(300px, 430px) minmax(360px, 1fr);
+      grid-template-columns: 250px 390px 1fr;
       overflow: hidden;
       border: 1px solid var(--line);
-      border-radius: 26px;
-      background: rgba(7, 16, 20, 0.76);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      background: rgba(8, 16, 19, .9);
     }
-
-    .sidebar, .message-column, .reader { min-height: 0; }
-
-    .sidebar {
-      display: flex;
-      flex-direction: column;
-      padding: 1.35rem;
-      border-right: 1px solid var(--line);
-      background: rgba(9, 24, 27, 0.7);
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.45rem;
-    }
-
-    .brand-mark {
-      display: grid;
-      width: 2.8rem;
-      height: 2.8rem;
-      place-items: center;
-      border: 1px solid rgba(98, 230, 188, 0.35);
-      border-radius: 14px;
-      color: var(--mint);
-      background: rgba(98, 230, 188, 0.1);
-      font-weight: 900;
-      letter-spacing: -0.08em;
-    }
-
-    .brand h1 { margin: 0; font-size: 1rem; letter-spacing: 0.06em; }
-    .brand p { margin: 0.2rem 0 0; color: var(--muted); font-size: 0.74rem; }
-
-    .primary-button, .secondary-button, .danger-button, .icon-button {
+    .sidebar, .messages { border-right: 1px solid var(--line); }
+    .sidebar { display: flex; flex-direction: column; padding: 1.2rem; background: var(--panel2); }
+    h1 { margin: 0; font-size: 1.1rem; }
+    .subtitle { margin: .3rem 0 1.2rem; color: var(--muted); font-size: .78rem; }
+    .compose {
+      width: 100%;
+      padding: .8rem;
       border: 0;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: transform 150ms ease, background 150ms ease, opacity 150ms ease;
+      border-radius: 11px;
+      background: var(--accent);
+      color: #062119;
+      font-weight: 800;
     }
-
-    .primary-button:hover, .secondary-button:hover, .danger-button:hover, .icon-button:hover {
-      transform: translateY(-1px);
-    }
-
-    .primary-button {
-      width: 100%;
-      padding: 0.8rem 1rem;
-      color: #062219;
-      background: linear-gradient(135deg, var(--mint), #8cf0cf);
-      font-weight: 850;
-    }
-
-    .secondary-button, .danger-button {
-      padding: 0.68rem 0.9rem;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.045);
-      font-size: 0.82rem;
-      font-weight: 700;
-    }
-
-    .danger-button { color: var(--danger); }
-
-    .folder-list {
-      display: grid;
-      gap: 0.35rem;
-      margin: 1.25rem 0;
-    }
-
-    .folder-button {
-      display: grid;
-      grid-template-columns: 1.4rem 1fr auto;
-      gap: 0.55rem;
-      align-items: center;
-      width: 100%;
-      padding: 0.7rem 0.75rem;
-      border: 1px solid transparent;
-      border-radius: 12px;
-      color: var(--muted);
-      background: transparent;
-      cursor: pointer;
-      text-align: left;
-    }
-
-    .folder-button:hover { color: var(--text); background: rgba(255, 255, 255, 0.035); }
-    .folder-button.active {
-      color: var(--text);
-      border-color: rgba(98, 230, 188, 0.24);
-      background: rgba(98, 230, 188, 0.1);
-    }
-
-    .folder-count {
-      min-width: 1.6rem;
-      padding: 0.15rem 0.35rem;
-      border-radius: 999px;
-      color: var(--mint);
-      background: rgba(98, 230, 188, 0.1);
-      font-size: 0.7rem;
-      text-align: center;
-    }
-
-    .session-card {
-      margin-top: auto;
-      padding: 0.9rem;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.025);
-    }
-
-    .eyebrow {
-      color: var(--mint);
-      font-size: 0.68rem;
-      font-weight: 900;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-
-    .session-user { margin: 0.45rem 0 0.75rem; font-size: 0.82rem; overflow-wrap: anywhere; }
-    .session-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
-
-    .message-column {
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid var(--line);
-      background: rgba(10, 22, 26, 0.46);
-    }
-
-    .column-header, .reader-header {
-      min-height: 88px;
-      padding: 1.25rem 1.3rem;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .column-header {
+    .folder-list { display: grid; gap: .35rem; margin-top: 1rem; }
+    .folder {
       display: flex;
       justify-content: space-between;
-      gap: 1rem;
-      align-items: center;
-    }
-
-    .column-header h2, .reader-header h2 { margin: 0; font-size: 1.12rem; }
-    .column-header p, .reader-header p { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.77rem; }
-
-    .icon-button {
-      width: 2.35rem;
-      height: 2.35rem;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.04);
-      font-size: 1rem;
-    }
-
-    .message-list {
-      flex: 1;
-      min-height: 0;
-      overflow: auto;
-      padding: 0.7rem;
-    }
-
-    .message-item {
       width: 100%;
-      margin-bottom: 0.5rem;
-      padding: 0.95rem;
+      padding: .7rem;
       border: 1px solid transparent;
-      border-radius: 15px;
-      color: var(--muted);
+      border-radius: 10px;
       background: transparent;
-      cursor: pointer;
+      color: var(--muted);
       text-align: left;
     }
-
-    .message-item:hover, .message-item.selected {
-      border-color: var(--line);
-      background: rgba(255, 255, 255, 0.04);
-    }
-
-    .message-item.unread { color: var(--text); background: rgba(98, 230, 188, 0.045); }
-    .message-item.unread .message-subject { font-weight: 850; }
-    .message-topline { display: flex; justify-content: space-between; gap: 0.6rem; }
-    .message-from { overflow: hidden; font-size: 0.8rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-    .message-date { flex: 0 0 auto; color: var(--muted); font-size: 0.66rem; }
-    .message-subject { margin-top: 0.35rem; color: var(--text); font-size: 0.83rem; line-height: 1.35; }
-
-    .empty-state {
-      display: grid;
-      min-height: 14rem;
-      place-items: center;
-      padding: 2rem;
-      color: var(--muted);
-      text-align: center;
-    }
-
-    .reader { display: flex; flex-direction: column; background: rgba(8, 18, 21, 0.3); }
-    .reader-header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
-    .reader-actions { display: none; gap: 0.45rem; }
-    .reader-actions.visible { display: flex; }
-
-    .reader-content {
-      flex: 1;
-      min-height: 0;
-      overflow: auto;
-      padding: clamp(1.25rem, 3vw, 2.4rem);
-    }
-
-    .reader-placeholder {
-      display: grid;
-      min-height: 100%;
-      place-items: center;
-      color: var(--muted);
-      text-align: center;
-    }
-
-    .reader-placeholder strong { display: block; margin-bottom: 0.45rem; color: var(--text); }
-    .message-meta { display: grid; gap: 0.25rem; margin-bottom: 1.6rem; color: var(--muted); font-size: 0.78rem; }
-    .message-meta strong { color: var(--text); }
-    .message-body { max-width: 74ch; color: #dcebe6; font-size: 0.94rem; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .notice { margin: 1rem 0; padding: 0.8rem; border-left: 3px solid var(--amber); color: #ffe3aa; background: rgba(255, 198, 109, 0.08); font-size: 0.8rem; }
-
-    dialog {
-      width: min(600px, calc(100% - 2rem));
-      padding: 0;
+    .folder.active, .folder:hover { border-color: var(--line); background: #13282e; color: var(--text); }
+    .local-card {
+      margin-top: auto;
+      padding: .9rem;
       border: 1px solid var(--line);
-      border-radius: 20px;
-      color: var(--text);
-      background: #0d2025;
-      box-shadow: var(--shadow);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: .76rem;
+      line-height: 1.5;
     }
-
-    dialog::backdrop { background: rgba(2, 8, 10, 0.76); backdrop-filter: blur(6px); }
-    .dialog-header { display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--line); }
-    .dialog-header h2 { margin: 0; font-size: 1rem; }
-    .dialog-body { display: grid; gap: 0.9rem; padding: 1.25rem; }
-    .dialog-footer { display: flex; justify-content: flex-end; gap: 0.55rem; padding: 0 1.25rem 1.25rem; }
-
-    label { display: grid; gap: 0.35rem; color: var(--muted); font-size: 0.76rem; font-weight: 700; }
+    .messages, .reader { min-height: 0; display: flex; flex-direction: column; }
+    .header { padding: 1rem 1.1rem; border-bottom: 1px solid var(--line); }
+    .header h2 { margin: 0; font-size: 1rem; }
+    .header p { margin: .35rem 0 0; color: var(--muted); font-size: .75rem; }
+    #messageList { overflow: auto; padding: .65rem; }
+    .message {
+      width: 100%;
+      margin-bottom: .45rem;
+      padding: .85rem;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--muted);
+      text-align: left;
+    }
+    .message:hover, .message.selected { border-color: var(--line); background: #122329; }
+    .message.unread { color: var(--text); background: #102820; }
+    .message .top { display: flex; justify-content: space-between; gap: .6rem; font-size: .75rem; }
+    .message .subject { margin-top: .35rem; color: var(--text); font-weight: 700; }
+    .reader-body { padding: 1.4rem; overflow: auto; }
+    .reader-body pre { white-space: pre-wrap; font: inherit; line-height: 1.65; color: #dbe9e5; }
+    .meta { color: var(--muted); font-size: .78rem; line-height: 1.55; }
+    .actions { display: flex; gap: .5rem; margin-top: 1rem; }
+    .secondary, .danger {
+      padding: .6rem .8rem;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #13262b;
+      color: var(--text);
+    }
+    .danger { color: var(--danger); }
+    .empty { padding: 2rem; color: var(--muted); text-align: center; }
+    dialog {
+      width: min(620px, calc(100% - 2rem));
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      color: var(--text);
+    }
+    dialog::backdrop { background: rgba(0, 0, 0, .72); }
+    form { display: grid; gap: .85rem; }
+    label { display: grid; gap: .35rem; color: var(--muted); font-size: .78rem; }
     input, textarea {
       width: 100%;
+      padding: .72rem;
       border: 1px solid var(--line);
-      border-radius: 11px;
-      padding: 0.75rem;
+      border-radius: 9px;
+      background: #081417;
       color: var(--text);
-      background: rgba(2, 10, 12, 0.55);
     }
-    textarea { min-height: 190px; resize: vertical; line-height: 1.5; }
-    .field-help { margin: -0.15rem 0 0; color: var(--muted); font-size: 0.69rem; }
-
-    .toast {
+    textarea { min-height: 180px; resize: vertical; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+    #toast {
       position: fixed;
       right: 1rem;
       bottom: 1rem;
-      z-index: 20;
-      max-width: min(380px, calc(100% - 2rem));
-      padding: 0.85rem 1rem;
-      border: 1px solid rgba(98, 230, 188, 0.25);
-      border-radius: 12px;
-      color: var(--text);
-      background: #123128;
-      box-shadow: var(--shadow);
+      max-width: 420px;
+      padding: .8rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #153229;
+      box-shadow: 0 14px 50px #0008;
     }
-    .toast.error { border-color: rgba(255, 140, 145, 0.35); background: #3c1d22; }
+    #toast.error { background: #3a1d21; }
     [hidden] { display: none !important; }
-
-    @media (max-width: 1050px) {
-      .app { grid-template-columns: 230px minmax(300px, 1fr); }
-      .reader { position: fixed; inset: 58px 1rem 1rem; z-index: 8; border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+    @media (max-width: 1000px) {
+      .app { grid-template-columns: 220px 1fr; }
+      .reader { position: fixed; inset: 62px 1rem 1rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel2); }
       .reader.mobile-hidden { display: none; }
     }
-
-    @media (max-width: 700px) {
-      .mode-banner { font-size: 0.72rem; }
-      .app { width: calc(100% - 1rem); min-height: calc(100vh - 62px); margin: 0.5rem; grid-template-columns: 1fr; border-radius: 18px; }
-      .sidebar { min-height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
-      .brand { margin-bottom: 0.8rem; }
-      .folder-list { grid-template-columns: repeat(3, 1fr); margin: 0.75rem 0; }
-      .folder-button { grid-template-columns: 1fr; justify-items: center; padding: 0.55rem; text-align: center; }
-      .folder-icon, .folder-count { display: none; }
-      .session-card { display: none; }
-      .message-column { border-right: 0; }
-      .reader { inset: 48px 0.5rem 0.5rem; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    @media (max-width: 680px) {
+      .app { width: calc(100% - 1rem); margin: .5rem; grid-template-columns: 1fr; height: auto; min-height: calc(100vh - 56px); }
+      .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+      .folder-list { grid-template-columns: repeat(3, 1fr); }
+      .messages { border-right: 0; min-height: 50vh; }
     }
   </style>
 </head>
 <body>
-  <div class="mode-banner" id="modeBanner" role="status">
-    <span class="dot" aria-hidden="true"></span>
-    <span>Loading isolated application mode…</span>
-  </div>
+  <div class="banner">LOCAL ONLY · SQLite storage · no external mail or cloud services</div>
 
-  <main class="app" aria-label="BFAB Mail Lab">
+  <main class="app">
     <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">B</div>
-        <div>
-          <h1>BFAB MAIL LAB</h1>
-          <p>privacy-first interface study</p>
-        </div>
-      </div>
-
-      <button class="primary-button" id="composeButton" type="button">＋ Compose simulation</button>
-      <nav class="folder-list" id="folderList" aria-label="Mail folders"></nav>
-
-      <div class="session-card">
-        <span class="eyebrow" id="sessionMode">Session</span>
-        <p class="session-user" id="sessionUser">Connecting…</p>
-        <div class="session-actions">
-          <button class="secondary-button" id="resetButton" type="button">Reset demo</button>
-          <button class="secondary-button" id="logoutButton" type="button" hidden>Sign out</button>
-        </div>
+      <h1>BFAB Local Mail</h1>
+      <p class="subtitle">Release {{ release }}</p>
+      <button class="compose" id="composeButton">Compose local message</button>
+      <div class="folder-list" id="folderList"></div>
+      <div class="local-card">
+        <strong id="localUser">local mailbox</strong><br>
+        Stored in SQLite on this computer.<br><br>
+        <button class="secondary" id="resetButton">Reset sample data</button>
       </div>
     </aside>
 
-    <section class="message-column" aria-labelledby="folderTitle">
-      <header class="column-header">
-        <div>
-          <h2 id="folderTitle">Inbox</h2>
-          <p id="folderSubtitle">Loading synthetic messages…</p>
-        </div>
-        <button class="icon-button" id="refreshButton" type="button" aria-label="Refresh messages">↻</button>
+    <section class="messages">
+      <header class="header">
+        <h2 id="folderTitle">INBOX</h2>
+        <p id="messageCount">Loading…</p>
       </header>
-      <div class="message-list" id="messageList" aria-live="polite"></div>
+      <div id="messageList"></div>
     </section>
 
-    <article class="reader mobile-hidden" id="reader" aria-labelledby="readerSubject">
-      <header class="reader-header">
-        <div>
-          <h2 id="readerSubject">Select a message</h2>
-          <p id="readerContext">Nothing leaves this browser session in showcase mode.</p>
-        </div>
-        <div class="reader-actions" id="readerActions">
-          <button class="danger-button" id="deleteButton" type="button">Delete</button>
-          <button class="icon-button" id="closeReaderButton" type="button" aria-label="Close message">×</button>
-        </div>
+    <section class="reader mobile-hidden" id="reader">
+      <header class="header">
+        <h2 id="readerTitle">Select a message</h2>
+        <p id="readerSubtitle">Messages never leave this computer.</p>
       </header>
-      <div class="reader-content" id="readerContent">
-        <div class="reader-placeholder">
-          <div><strong>Choose a message to inspect</strong>Content, identities and delivery are synthetic.</div>
-        </div>
+      <div class="reader-body" id="readerBody">
+        <div class="empty">Choose a message from the list.</div>
       </div>
-    </article>
+    </section>
   </main>
 
-  <dialog id="composeDialog" aria-labelledby="composeTitle">
+  <dialog id="composeDialog">
     <form id="composeForm">
-      <header class="dialog-header">
-        <h2 id="composeTitle">Compose a simulated message</h2>
-        <button class="icon-button dialog-close" type="button" aria-label="Close compose dialog">×</button>
-      </header>
-      <div class="dialog-body">
-        <div class="notice" id="composeNotice">Showcase messages are stored in this temporary session and are never delivered.</div>
-        <label>To
-          <input name="to" type="text" autocomplete="off" maxlength="3200" required placeholder="reviewer@example.invalid">
-        </label>
-        <label>Subject
-          <input name="subject" type="text" maxlength="200" required placeholder="Project handoff">
-        </label>
-        <label>Message
-          <textarea name="body" maxlength="20000" required placeholder="Write a concise synthetic note…"></textarea>
-        </label>
-        <p class="field-help">Up to 10 recipients, 200 subject characters and 20,000 body characters.</p>
+      <h2>Compose local message</h2>
+      <label>To
+        <input id="composeTo" type="text" placeholder="someone@example.invalid" required>
+      </label>
+      <label>Subject
+        <input id="composeSubject" type="text" maxlength="200">
+      </label>
+      <label>Body
+        <textarea id="composeBody" maxlength="20000"></textarea>
+      </label>
+      <p class="meta">Send stores the message in the local Sent folder. It does not use SMTP and does not deliver email to the Internet.</p>
+      <div class="dialog-actions">
+        <button class="secondary" type="button" id="cancelCompose">Cancel</button>
+        <button class="compose" type="submit">Store in Sent</button>
       </div>
-      <footer class="dialog-footer">
-        <button class="secondary-button dialog-close" type="button">Cancel</button>
-        <button class="primary-button" type="submit">Send simulation</button>
-      </footer>
     </form>
   </dialog>
 
-  <dialog id="loginDialog" aria-labelledby="loginTitle">
-    <form id="loginForm">
-      <header class="dialog-header"><h2 id="loginTitle">Connect a self-hosted mailbox</h2></header>
-      <div class="dialog-body">
-        <div class="notice">Live mode sends credentials only to the configured server-side IMAP service. Do not use this form on an untrusted deployment.</div>
-        <label>Email
-          <input name="email" type="email" autocomplete="username" maxlength="320" required>
-        </label>
-        <label>Password
-          <input name="password" type="password" autocomplete="current-password" maxlength="512" required>
-        </label>
-      </div>
-      <footer class="dialog-footer"><button class="primary-button" type="submit">Connect securely</button></footer>
-    </form>
-  </dialog>
+  <div id="toast" hidden></div>
 
-  <div class="toast" id="toast" role="status" hidden></div>
-
-  <script nonce="{{ csp_nonce }}">
-    const ui = {
-      modeBanner: document.querySelector('#modeBanner'),
-      composeButton: document.querySelector('#composeButton'),
-      folderList: document.querySelector('#folderList'),
-      sessionMode: document.querySelector('#sessionMode'),
-      sessionUser: document.querySelector('#sessionUser'),
-      resetButton: document.querySelector('#resetButton'),
-      logoutButton: document.querySelector('#logoutButton'),
-      folderTitle: document.querySelector('#folderTitle'),
-      folderSubtitle: document.querySelector('#folderSubtitle'),
-      refreshButton: document.querySelector('#refreshButton'),
-      messageList: document.querySelector('#messageList'),
-      reader: document.querySelector('#reader'),
-      readerSubject: document.querySelector('#readerSubject'),
-      readerContext: document.querySelector('#readerContext'),
-      readerActions: document.querySelector('#readerActions'),
-      readerContent: document.querySelector('#readerContent'),
-      deleteButton: document.querySelector('#deleteButton'),
-      closeReaderButton: document.querySelector('#closeReaderButton'),
-      composeDialog: document.querySelector('#composeDialog'),
-      composeForm: document.querySelector('#composeForm'),
-      composeTitle: document.querySelector('#composeTitle'),
-      composeNotice: document.querySelector('#composeNotice'),
-      loginDialog: document.querySelector('#loginDialog'),
-      loginForm: document.querySelector('#loginForm'),
-      toast: document.querySelector('#toast')
+  <script>
+    const state = {
+      csrf: "",
+      folder: "INBOX",
+      selectedUid: null,
+      folders: []
     };
 
-    let state = null;
-    let activeFolder = 'INBOX';
-    let activeMessage = null;
-    let toastTimer = null;
+    const folderList = document.getElementById("folderList");
+    const messageList = document.getElementById("messageList");
+    const folderTitle = document.getElementById("folderTitle");
+    const messageCount = document.getElementById("messageCount");
+    const reader = document.getElementById("reader");
+    const readerTitle = document.getElementById("readerTitle");
+    const readerSubtitle = document.getElementById("readerSubtitle");
+    const readerBody = document.getElementById("readerBody");
+    const toast = document.getElementById("toast");
+    const dialog = document.getElementById("composeDialog");
+
+    function showToast(message, error = false) {
+      toast.textContent = message;
+      toast.className = error ? "error" : "";
+      toast.hidden = false;
+      window.setTimeout(() => { toast.hidden = true; }, 3500);
+    }
 
     async function api(path, options = {}) {
-      const requestOptions = { ...options, headers: { Accept: 'application/json', ...(options.headers || {}) } };
-      if (requestOptions.body && typeof requestOptions.body !== 'string') {
-        requestOptions.headers['Content-Type'] = 'application/json';
-        requestOptions.body = JSON.stringify(requestOptions.body);
-      }
-      if (requestOptions.method && requestOptions.method !== 'GET' && state?.csrf_token) {
-        requestOptions.headers['X-CSRF-Token'] = state.csrf_token;
-      }
-      const response = await fetch(path, requestOptions);
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || payload.message || `Request failed (${response.status})`);
-      return payload;
+      const headers = new Headers(options.headers || {});
+      if (options.body) headers.set("Content-Type", "application/json");
+      if (options.method && options.method !== "GET") headers.set("X-CSRF-Token", state.csrf);
+      const response = await fetch(path, {...options, headers});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+      return data;
     }
 
-    function showToast(message, isError = false) {
-      clearTimeout(toastTimer);
-      ui.toast.textContent = message;
-      ui.toast.classList.toggle('error', isError);
-      ui.toast.hidden = false;
-      toastTimer = setTimeout(() => { ui.toast.hidden = true; }, 4500);
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
-    function formatDate(value) {
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) return value || '';
-      return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(parsed);
-    }
-
-    function folderIcon(role) {
-      return { inbox: '↓', sent: '↗', trash: '⌫', drafts: '◇', junk: '!' }[role] || '□';
-    }
-
-    function applyMode() {
-      const showcase = state.mode === 'showcase';
-      ui.modeBanner.classList.toggle('live', !showcase);
-      ui.modeBanner.querySelector('span:last-child').textContent = showcase
-        ? 'SAFE SHOWCASE · SYNTHETIC DATA · NO PASSWORDS · NO REAL DELIVERY'
-        : 'LIVE SELF-HOSTED MODE · REAL IMAP/SMTP CONNECTIONS';
-      ui.sessionMode.textContent = showcase ? 'Ephemeral showcase' : 'Live mailbox';
-      ui.sessionUser.textContent = state.user || 'Not connected';
-      ui.resetButton.hidden = !showcase;
-      ui.logoutButton.hidden = showcase || !state.authenticated;
-      ui.composeButton.textContent = showcase ? '＋ Compose simulation' : '＋ Compose message';
-      ui.composeTitle.textContent = showcase ? 'Compose a simulated message' : 'Compose a live message';
-      ui.composeNotice.textContent = showcase
-        ? 'Showcase messages are stored in this temporary session and are never delivered.'
-        : 'This message will be submitted to the configured SMTP server.';
-      ui.readerContext.textContent = showcase
-        ? 'Synthetic content stored only in this temporary session.'
-        : 'Connected to the configured self-hosted mailbox.';
+    async function loadState() {
+      const data = await api("/api/state");
+      state.csrf = data.csrf_token;
+      document.getElementById("localUser").textContent = data.user;
     }
 
     async function loadFolders() {
-      const payload = await api('/api/folders');
-      ui.folderList.replaceChildren();
-      payload.folders.forEach((folder) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `folder-button${folder.name === activeFolder ? ' active' : ''}`;
-        button.dataset.folder = folder.name;
-
-        const icon = document.createElement('span');
-        icon.className = 'folder-icon';
-        icon.textContent = folderIcon(folder.role);
-        const label = document.createElement('span');
-        label.textContent = folder.display_name || folder.name;
-        const count = document.createElement('span');
-        count.className = 'folder-count';
-        count.textContent = folder.unread ?? folder.count ?? '';
-
-        button.append(icon, label, count);
-        button.addEventListener('click', async () => {
-          activeFolder = folder.name;
-          activeMessage = null;
-          closeReader();
-          await Promise.all([loadFolders(), loadMessages()]);
-        });
-        ui.folderList.append(button);
+      const data = await api("/api/folders");
+      state.folders = data.folders;
+      folderList.innerHTML = data.folders.map(folder => `
+        <button class="folder ${folder.name === state.folder ? "active" : ""}" data-folder="${escapeHtml(folder.name)}">
+          <span>${escapeHtml(folder.name)}</span><span>${folder.count}</span>
+        </button>
+      `).join("");
+      folderList.querySelectorAll(".folder").forEach(button => {
+        button.addEventListener("click", () => selectFolder(button.dataset.folder));
       });
     }
 
     async function loadMessages() {
-      ui.folderTitle.textContent = activeFolder === 'INBOX' ? 'Inbox' : activeFolder;
-      ui.folderSubtitle.textContent = 'Loading…';
-      const payload = await api(`/api/messages?folder=${encodeURIComponent(activeFolder)}`);
-      ui.folderSubtitle.textContent = `${payload.messages.length} message${payload.messages.length === 1 ? '' : 's'}`;
-      ui.messageList.replaceChildren();
-
-      if (!payload.messages.length) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-state';
-        empty.textContent = 'This folder is empty.';
-        ui.messageList.append(empty);
+      folderTitle.textContent = state.folder;
+      const data = await api(`/api/messages?folder=${encodeURIComponent(state.folder)}`);
+      messageCount.textContent = `${data.messages.length} message${data.messages.length === 1 ? "" : "s"}`;
+      if (!data.messages.length) {
+        messageList.innerHTML = '<div class="empty">No messages in this folder.</div>';
+        clearReader();
         return;
       }
-
-      payload.messages.forEach((message) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `message-item${message.is_read ? '' : ' unread'}${activeMessage?.uid === message.uid ? ' selected' : ''}`;
-
-        const top = document.createElement('div');
-        top.className = 'message-topline';
-        const sender = document.createElement('span');
-        sender.className = 'message-from';
-        sender.textContent = activeFolder === 'Sent' ? message.to : message.from;
-        const date = document.createElement('span');
-        date.className = 'message-date';
-        date.textContent = formatDate(message.date);
-        top.append(sender, date);
-
-        const subject = document.createElement('div');
-        subject.className = 'message-subject';
-        subject.textContent = message.subject;
-        button.append(top, subject);
-        button.addEventListener('click', () => openMessage(message));
-        ui.messageList.append(button);
+      messageList.innerHTML = data.messages.map(message => `
+        <button class="message ${message.read ? "" : "unread"} ${message.uid === state.selectedUid ? "selected" : ""}" data-uid="${message.uid}">
+          <div class="top">
+            <span>${escapeHtml(state.folder === "Sent" ? message.to : message.from)}</span>
+            <span>${escapeHtml(new Date(message.date).toLocaleString())}</span>
+          </div>
+          <div class="subject">${escapeHtml(message.subject || "(no subject)")}</div>
+        </button>
+      `).join("");
+      messageList.querySelectorAll(".message").forEach(button => {
+        button.addEventListener("click", () => openMessage(button.dataset.uid));
       });
     }
 
-    async function openMessage(summary) {
-      const payload = await api(`/api/messages/${encodeURIComponent(summary.uid)}?folder=${encodeURIComponent(activeFolder)}`);
-      activeMessage = payload.message;
-      ui.readerSubject.textContent = activeMessage.subject;
-      ui.readerActions.classList.add('visible');
-      ui.reader.classList.remove('mobile-hidden');
-      ui.readerContent.replaceChildren();
+    function clearReader() {
+      state.selectedUid = null;
+      readerTitle.textContent = "Select a message";
+      readerSubtitle.textContent = "Messages never leave this computer.";
+      readerBody.innerHTML = '<div class="empty">Choose a message from the list.</div>';
+      reader.classList.add("mobile-hidden");
+    }
 
-      const meta = document.createElement('div');
-      meta.className = 'message-meta';
-      [['From', activeMessage.from], ['To', activeMessage.to], ['Date', activeMessage.date]].forEach(([label, value]) => {
-        const row = document.createElement('div');
-        const strong = document.createElement('strong');
-        strong.textContent = `${label}: `;
-        row.append(strong, document.createTextNode(value || '—'));
-        meta.append(row);
+    async function selectFolder(folder) {
+      state.folder = folder;
+      clearReader();
+      await loadFolders();
+      await loadMessages();
+    }
+
+    async function openMessage(uid) {
+      const data = await api(`/api/messages/${uid}?folder=${encodeURIComponent(state.folder)}`);
+      const message = data.message;
+      state.selectedUid = uid;
+      readerTitle.textContent = message.subject || "(no subject)";
+      readerSubtitle.textContent = `${message.from} → ${message.to}`;
+      readerBody.innerHTML = `
+        <div class="meta">
+          <strong>From:</strong> ${escapeHtml(message.from)}<br>
+          <strong>To:</strong> ${escapeHtml(message.to)}<br>
+          <strong>Date:</strong> ${escapeHtml(new Date(message.date).toLocaleString())}
+        </div>
+        <pre>${escapeHtml(message.body)}</pre>
+        <div class="actions">
+          <button class="secondary" id="readToggle">${message.read ? "Mark unread" : "Mark read"}</button>
+          <button class="danger" id="deleteMessage">${state.folder === "Trash" ? "Delete permanently" : "Move to Trash"}</button>
+        </div>
+      `;
+      reader.classList.remove("mobile-hidden");
+      document.getElementById("readToggle").addEventListener("click", () => setRead(uid, !message.read));
+      document.getElementById("deleteMessage").addEventListener("click", () => deleteMessage(uid));
+      await loadMessages();
+    }
+
+    async function setRead(uid, read) {
+      await api(`/api/messages/${uid}/read?folder=${encodeURIComponent(state.folder)}`, {
+        method: "POST",
+        body: JSON.stringify({read})
       });
-
-      if (activeMessage.truncated) {
-        const notice = document.createElement('div');
-        notice.className = 'notice';
-        notice.textContent = 'Large message preview truncated for safety.';
-        ui.readerContent.append(notice);
-      }
-      const body = document.createElement('div');
-      body.className = 'message-body';
-      body.textContent = activeMessage.body || '(Empty message)';
-      ui.readerContent.prepend(meta);
-      ui.readerContent.append(body);
-
-      if (!summary.is_read) {
-        await api(`/api/messages/${encodeURIComponent(summary.uid)}/read?folder=${encodeURIComponent(activeFolder)}`, {
-          method: 'POST', body: { read: true }
-        });
-        await Promise.all([loadFolders(), loadMessages()]);
-      } else {
-        await loadMessages();
-      }
+      await openMessage(uid);
+      await loadFolders();
     }
 
-    function closeReader() {
-      activeMessage = null;
-      ui.reader.classList.add('mobile-hidden');
-      ui.readerActions.classList.remove('visible');
-      ui.readerSubject.textContent = 'Select a message';
-      ui.readerContent.innerHTML = '<div class="reader-placeholder"><div><strong>Choose a message to inspect</strong>Content, identities and delivery are synthetic.</div></div>';
+    async function deleteMessage(uid) {
+      await api(`/api/messages/${uid}?folder=${encodeURIComponent(state.folder)}`, {method: "DELETE"});
+      showToast(state.folder === "Trash" ? "Message deleted." : "Message moved to Trash.");
+      clearReader();
+      await loadFolders();
+      await loadMessages();
     }
 
-    async function deleteActiveMessage() {
-      if (!activeMessage) return;
-      await api(`/api/messages/${encodeURIComponent(activeMessage.uid)}?folder=${encodeURIComponent(activeFolder)}`, { method: 'DELETE' });
-      showToast(activeFolder === 'Trash' ? 'Message removed from the session.' : 'Message moved to Trash.');
-      closeReader();
-      await Promise.all([loadFolders(), loadMessages()]);
-    }
+    document.getElementById("composeButton").addEventListener("click", () => dialog.showModal());
+    document.getElementById("cancelCompose").addEventListener("click", () => dialog.close());
 
-    async function initialize() {
-      state = await api('/api/state');
-      applyMode();
-      if (state.mode === 'live' && !state.authenticated) {
-        ui.loginDialog.showModal();
-        return;
-      }
-      await Promise.all([loadFolders(), loadMessages()]);
-    }
-
-    ui.composeButton.addEventListener('click', () => ui.composeDialog.showModal());
-    document.querySelectorAll('.dialog-close').forEach((button) => button.addEventListener('click', () => ui.composeDialog.close()));
-    ui.closeReaderButton.addEventListener('click', closeReader);
-    ui.deleteButton.addEventListener('click', () => deleteActiveMessage().catch((error) => showToast(error.message, true)));
-    ui.refreshButton.addEventListener('click', () => Promise.all([loadFolders(), loadMessages()]).catch((error) => showToast(error.message, true)));
-
-    ui.composeForm.addEventListener('submit', async (event) => {
+    document.getElementById("composeForm").addEventListener("submit", async event => {
       event.preventDefault();
-      const data = new FormData(ui.composeForm);
       try {
-        const payload = await api('/api/send', {
-          method: 'POST',
-          body: { to: data.get('to'), subject: data.get('subject'), body: data.get('body') }
+        const result = await api("/api/send", {
+          method: "POST",
+          body: JSON.stringify({
+            to: document.getElementById("composeTo").value,
+            subject: document.getElementById("composeSubject").value,
+            body: document.getElementById("composeBody").value
+          })
         });
-        ui.composeForm.reset();
-        ui.composeDialog.close();
-        showToast(payload.warning || 'Message sent.');
-        activeFolder = 'Sent';
-        await Promise.all([loadFolders(), loadMessages()]);
+        event.target.reset();
+        dialog.close();
+        showToast(result.warning);
+        await loadFolders();
+        if (state.folder === "Sent") await loadMessages();
       } catch (error) {
         showToast(error.message, true);
       }
     });
 
-    ui.resetButton.addEventListener('click', async () => {
+    document.getElementById("resetButton").addEventListener("click", async () => {
       try {
-        const payload = await api('/api/demo/reset', { method: 'POST', body: {} });
-        state = payload.state;
-        activeFolder = 'INBOX';
-        closeReader();
-        applyMode();
-        await Promise.all([loadFolders(), loadMessages()]);
-        showToast('Synthetic session restored.');
-      } catch (error) { showToast(error.message, true); }
+        await api("/api/reset", {method: "POST", body: JSON.stringify({})});
+        state.folder = "INBOX";
+        clearReader();
+        await loadFolders();
+        await loadMessages();
+        showToast("Local database reset to sample data.");
+      } catch (error) {
+        showToast(error.message, true);
+      }
     });
 
-    ui.logoutButton.addEventListener('click', async () => {
+    (async () => {
       try {
-        state = await api('/api/logout', { method: 'POST', body: {} });
-        applyMode();
-        ui.loginDialog.showModal();
-      } catch (error) { showToast(error.message, true); }
-    });
-
-    ui.loginForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const data = new FormData(ui.loginForm);
-      try {
-        state = await api('/api/login', {
-          method: 'POST',
-          body: { email: data.get('email'), password: data.get('password') }
-        });
-        ui.loginForm.reset();
-        ui.loginDialog.close();
-        applyMode();
-        await Promise.all([loadFolders(), loadMessages()]);
-      } catch (error) { showToast(error.message, true); }
-    });
-
-    initialize().catch((error) => {
-      showToast(error.message, true);
-      ui.folderSubtitle.textContent = 'Application unavailable';
-    });
+        await loadState();
+        await loadFolders();
+        await loadMessages();
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    })();
   </script>
 </body>
 </html>

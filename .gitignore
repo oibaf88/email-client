@@ -16,11 +16,6 @@ env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.docker-config/
 
-instance/
-flask_session/
-docker-data/
-infra/mta-sts/.well-known/mta-sts.txt
-infra/mailserver/config/*
-!infra/mailserver/config/postfix-main.cf
+data/*
+!data/.gitkeep

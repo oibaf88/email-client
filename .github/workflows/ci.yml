@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - codex/**
+      - local-only/**
   pull_request:
 
 permissions:
