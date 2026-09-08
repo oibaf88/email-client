@@ -7,8 +7,8 @@ venv
 env
 __pycache__
 *.pyc
-flask_session
-docker-data
 .pytest_cache
 .mypy_cache
 .ruff_cache
+data/*.db
+data/*.db-*

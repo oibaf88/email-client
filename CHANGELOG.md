@@ -1,52 +1,28 @@
 # Changelog
 
-All notable changes to BFAB Mail Lab are documented here. The project follows Semantic Versioning from v1.0.0 onward.
+## 2.0.0 — Local SQLite
 
-## [1.2.0] - 2026-07-26
+- Converted the project to a local-only runtime.
+- Replaced session-only synthetic mailbox state with persistent SQLite storage.
+- Added automatic local database schema creation and sample seeding.
+- Removed IMAP and SMTP network mail code.
+- Removed Redis and Flask-Session runtime dependencies.
+- Removed Render deployment configuration.
+- Removed the VPS Docker Mailserver/Caddy/certbot/DNS infrastructure.
+- Removed the production Compose stack.
+- Simplified Docker Compose to one localhost-bound Flask container.
+- Added host-persistent `data/email-client.db` storage.
+- Added a local-only web interface and local message composition.
+- Added `DEPLOY.md` with Windows/Docker/SQLite setup and maintenance.
+- Rewrote tests for the local SQLite architecture.
 
-### Added
+## 1.2.0 — Safe Showcase
 
-- Explicit `showcase` and `live` application modes.
-- Synthetic, ephemeral showcase mailbox with simulated read, unread, delete, send and reset operations.
-- Clear UI and API indicators for simulated data and delivery.
-- `/healthz` liveness and `/readyz` readiness probes.
-- Payload, UID, recipient, subject, body, password and rate limits.
-- CSP nonces and hardened browser response headers.
-- Pytest regression suite, Ruff configuration and GitHub Actions CI.
-- Canonical release history and safe deployment documentation.
+- Added explicit showcase/live boundaries.
+- Added synthetic showcase mailbox behavior.
+- Added security headers, CSRF protection, validation limits, health checks, and CI.
+- Added optional private live mail infrastructure.
 
-### Changed
+## 1.0.0
 
-- Render now deploys only the isolated showcase and carries no mail or Supabase secrets.
-- Production startup fails closed on a weak Flask secret or insecure session cookies.
-- Live login verifies credentials before storing them and regenerates the session identifier.
-- All writes, including login, require CSRF validation.
-- Live message reads use bounded previews and message lists retain batched IMAP fetches.
-
-### Removed
-
-- Duplicate legacy `readme.md`.
-- Obsolete Fly.io, Procfile and `runtime.txt` deployment files.
-- Unused Flake8 and generated agent-note configuration.
-- Supabase from the application runtime path.
-
-## [1.1.0] - 2026-07-22
-
-- Replaced per-message IMAP header requests with a bounded batch fetch.
-- Reduced mailbox-list latency and avoided the N+1 fetch pattern.
-
-## [1.0.0] - 2026-07-03
-
-- Introduced the browser-based IMAP/SMTP webmail client.
-- Added server-side sessions, CSRF protection and Docker deployment.
-- Added optional Docker Mailserver, Redis, Caddy, MTA-STS and bootstrap infrastructure.
-
-## [0.2.0] - 2026-06-20
-
-- Added an early Flask interface and Supabase-backed email demonstration.
-- Expanded the original object-oriented prototype into a hosted experiment.
-
-## [0.1.0] - 2026-06-19
-
-- Created the first console-based object-oriented email system prototype.
-- Implemented basic account, message and folder concepts with in-memory state.
+- Initial project.
