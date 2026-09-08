@@ -10,148 +10,166 @@ def client(tmp_path):
     app_module.app.config.update(
         TESTING=True,
         DATABASE_PATH=str(tmp_path / "test-email-client.db"),
-        LOCAL_ADDRESS="local@test.invalid",
     )
     with app_module.app.test_client() as test_client:
         yield test_client
 
 
-def get_state(client):
+def state(client):
     response = client.get("/api/state")
     assert response.status_code == 200
     return response.get_json()
 
 
 def headers(client):
-    return {"X-CSRF-Token": get_state(client)["csrf_token"]}
+    return {"X-CSRF-Token": state(client)["csrf_token"]}
 
 
-def test_local_state_has_no_external_services(client):
-    state = get_state(client)
-    assert state["mode"] == "local"
-    assert state["release"] == "2.0.0"
-    assert state["authenticated"] is True
-    assert state["local_only"] is True
-    assert state["network_access"] is False
-    assert state["storage"] == "sqlite"
-    assert state["user"] == "local@test.invalid"
+def save_config(client):
+    response = client.post(
+        "/api/config",
+        json={
+            "mail_domain": "example.com",
+            "imap_host": "imap.example.com",
+            "imap_port": 993,
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "sent_folder": "Sent",
+        },
+        headers=headers(client),
+    )
+    assert response.status_code == 200
+    return response.get_json()["config"]
 
 
-def test_database_is_created_and_seeded(client, tmp_path):
-    folders = client.get("/api/folders")
-    assert folders.status_code == 200
-    counts = {item["name"]: item["count"] for item in folders.get_json()["folders"]}
-    assert counts == {"INBOX": 3, "Sent": 1, "Trash": 0}
+def test_local_state_and_database(client, tmp_path):
+    current = state(client)
+    assert current["mode"] == "local"
+    assert current["release"] == "2.1.0"
+    assert current["configured"] is False
+    assert current["authenticated"] is False
+    assert current["storage"] == "sqlite"
+    assert current["runtime"] == "localhost"
+    assert current["network_access"] == "imap-smtp-only"
 
     path = tmp_path / "test-email-client.db"
     assert path.exists()
     with sqlite3.connect(path) as connection:
-        assert connection.execute("SELECT COUNT(*) FROM messages").fetchone()[0] == 4
+        tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "mail_config" in tables
 
 
-def test_messages_persist_in_sqlite(client):
-    state = get_state(client)
+def test_config_is_saved_locally_without_password(client, tmp_path):
+    config = save_config(client)
+    assert config["imap_host"] == "imap.example.com"
+    assert config["smtp_port"] == 587
+
+    with sqlite3.connect(tmp_path / "test-email-client.db") as connection:
+        columns = [row[1] for row in connection.execute("PRAGMA table_info(mail_config)")]
+        row = connection.execute("SELECT imap_host, smtp_host FROM mail_config WHERE id=1").fetchone()
+    assert "password" not in columns
+    assert row == ("imap.example.com", "smtp.example.com")
+
+
+def test_login_uses_imap_and_server_side_session(client, monkeypatch):
+    config = save_config(client)
+    calls = []
+    monkeypatch.setattr(
+        app_module,
+        "validate_live_credentials",
+        lambda user, password, saved: calls.append((user, password, saved)),
+    )
+
+    response = client.post(
+        "/api/login",
+        json={"email": "owner@example.com", "password": "app-password"},
+        headers=headers(client),
+    )
+    assert response.status_code == 200
+    assert response.get_json()["authenticated"] is True
+    assert calls == [("owner@example.com", "app-password", config)]
+
+    with client.session_transaction() as current_session:
+        assert current_session["mail_user"] == "owner@example.com"
+        assert current_session["mail_password"] == "app-password"
+
+
+def test_config_change_clears_mail_credentials(client, monkeypatch):
+    save_config(client)
+    monkeypatch.setattr(app_module, "validate_live_credentials", lambda *_: None)
+    client.post(
+        "/api/login",
+        json={"email": "owner@example.com", "password": "secret"},
+        headers=headers(client),
+    )
+    save_config(client)
+    assert state(client)["authenticated"] is False
+
+
+def test_mail_routes_delegate_to_imap(client, monkeypatch):
+    save_config(client)
+    monkeypatch.setattr(app_module, "validate_live_credentials", lambda *_: None)
+    client.post(
+        "/api/login",
+        json={"email": "owner@example.com", "password": "secret"},
+        headers=headers(client),
+    )
+    monkeypatch.setattr(
+        app_module,
+        "live_folders",
+        lambda: [{"name": "INBOX", "display_name": "INBOX", "role": "inbox"}],
+    )
+    monkeypatch.setattr(
+        app_module,
+        "live_messages",
+        lambda folder: [{"uid": "1", "subject": "Hello", "from": "a@example.com", "to": "owner@example.com", "date": "now", "is_read": False}],
+    )
+    monkeypatch.setattr(
+        app_module,
+        "live_message",
+        lambda folder, uid: {"uid": uid, "subject": "Hello", "from": "a@example.com", "to": "owner@example.com", "date": "now", "is_read": False, "body": "Body", "attachments": [], "truncated": False},
+    )
+
+    assert client.get("/api/folders").status_code == 200
+    assert client.get("/api/messages?folder=INBOX").get_json()["messages"][0]["uid"] == "1"
+    assert client.get("/api/messages/1?folder=INBOX").get_json()["message"]["body"] == "Body"
+
+
+def test_send_uses_real_smtp_path(client, monkeypatch):
+    save_config(client)
+    monkeypatch.setattr(app_module, "validate_live_credentials", lambda *_: None)
+    client.post(
+        "/api/login",
+        json={"email": "owner@example.com", "password": "secret"},
+        headers=headers(client),
+    )
+    sent = []
+    monkeypatch.setattr(app_module, "live_send", lambda message: sent.append(message))
+    monkeypatch.setattr(app_module, "append_to_sent", lambda message: None)
+
     response = client.post(
         "/api/send",
-        json={
-            "to": "recipient@example.invalid",
-            "subject": "Persist me",
-            "body": "Stored in SQLite.",
-        },
-        headers={"X-CSRF-Token": state["csrf_token"]},
+        json={"to": "recipient@example.net", "subject": "Real path", "body": "Body"},
+        headers=headers(client),
     )
     assert response.status_code == 201
-    payload = response.get_json()
-    assert payload["stored"] is True
-    assert payload["delivered"] is False
-
-    sent = client.get("/api/messages?folder=Sent").get_json()["messages"]
-    assert any(message["subject"] == "Persist me" for message in sent)
+    assert response.get_json()["delivered"] is True
+    assert len(sent) == 1
+    assert sent[0]["To"] == "recipient@example.net"
 
 
-def test_read_and_delete_flow(client):
-    inbox = client.get("/api/messages?folder=INBOX").get_json()["messages"]
-    uid = inbox[0]["uid"]
+def test_csrf_and_auth_are_required(client):
+    assert client.post("/api/config", json={}).status_code == 403
+    assert client.get("/api/folders").status_code == 401
 
+
+def test_invalid_config_is_rejected(client):
     response = client.post(
-        f"/api/messages/{uid}/read?folder=INBOX",
-        json={"read": True},
+        "/api/config",
+        json={"imap_host": "bad host", "imap_port": 993, "smtp_host": "smtp.example.com", "smtp_port": 587},
         headers=headers(client),
-    )
-    assert response.status_code == 200
-    assert response.get_json()["read"] is True
-
-    response = client.delete(
-        f"/api/messages/{uid}?folder=INBOX",
-        headers=headers(client),
-    )
-    assert response.status_code == 200
-    assert response.get_json()["action"] == "moved-to-trash"
-
-    trash = client.get("/api/messages?folder=Trash").get_json()["messages"]
-    assert any(message["uid"] == uid for message in trash)
-
-    response = client.delete(
-        f"/api/messages/{uid}?folder=Trash",
-        headers=headers(client),
-    )
-    assert response.status_code == 200
-    assert response.get_json()["action"] == "deleted"
-
-
-def test_reset_restores_seed(client):
-    client.post(
-        "/api/send",
-        json={"to": "a@example.invalid", "subject": "Temporary", "body": "Temporary"},
-        headers=headers(client),
-    )
-    response = client.post("/api/reset", json={}, headers=headers(client))
-    assert response.status_code == 200
-
-    counts = {
-        item["name"]: item["count"]
-        for item in client.get("/api/folders").get_json()["folders"]
-    }
-    assert counts == {"INBOX": 3, "Sent": 1, "Trash": 0}
-
-
-def test_csrf_required_for_writes(client):
-    response = client.post(
-        "/api/send",
-        json={"to": "a@example.invalid", "subject": "No token", "body": "Blocked"},
-    )
-    assert response.status_code == 403
-
-
-def test_validation_limits(client):
-    token_headers = headers(client)
-    too_many = ", ".join(f"user{i}@example.invalid" for i in range(11))
-    response = client.post(
-        "/api/send",
-        json={"to": too_many, "subject": "Valid", "body": "Valid"},
-        headers=token_headers,
     )
     assert response.status_code == 400
-
-    response = client.post(
-        "/api/send",
-        json={
-            "to": "a@example.invalid",
-            "subject": "x" * (app_module.MAX_SUBJECT_CHARS + 1),
-            "body": "Valid",
-        },
-        headers=token_headers,
-    )
-    assert response.status_code == 400
-
-    response = client.get("/api/messages/not-a-number?folder=INBOX")
-    assert response.status_code == 400
-
-
-def test_login_and_logout_are_disabled(client):
-    token_headers = headers(client)
-    assert client.post("/api/login", json={}, headers=token_headers).status_code == 409
-    assert client.post("/api/logout", json={}, headers=token_headers).status_code == 409
 
 
 def test_health_ready_and_security_headers(client):
@@ -159,13 +177,12 @@ def test_health_ready_and_security_headers(client):
     ready = client.get("/readyz")
     page = client.get("/")
 
-    assert health.get_json() == {"mode": "local", "release": "2.0.0", "status": "alive"}
+    assert health.get_json() == {"mode": "local", "release": "2.1.0", "status": "alive"}
     assert ready.status_code == 200
     assert ready.get_json()["storage"] == "sqlite"
-    assert ready.get_json()["database"] == "test-email-client.db"
-
+    assert ready.get_json()["mail_configured"] is False
     assert page.status_code == 200
-    assert b"LOCAL ONLY" in page.data
+    assert b"real IMAP/SMTP mail" in page.data
     assert page.headers["Cache-Control"] == "no-store"
     assert page.headers["X-Frame-Options"] == "DENY"
     assert "frame-ancestors 'none'" in page.headers["Content-Security-Policy"]

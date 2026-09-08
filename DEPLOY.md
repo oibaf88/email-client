@@ -1,65 +1,56 @@
 # Local deployment guide
 
-This repository supports **one deployment target: your own computer**.
+This repository has one deployment target: **the user's own computer**. The application is not deployed to Render or a VPS.
 
-There is no Render deployment, VPS mail appliance, Supabase project, Redis server, Caddy reverse proxy, Docker Mailserver, IMAP service, SMTP service, DNS setup, or TLS certificate workflow.
+The local Flask process may connect to the IMAP/SMTP servers you explicitly configure because that is how it reads and sends real email. No public web server, inbound mail server, cloud database, Redis instance, Caddy proxy, or certificate service is part of the runtime.
 
-## 1. Recommended software
+## 1. Software to install on Windows
 
-### Required
-
-Install:
+Required:
 
 1. **Git**
 2. **Docker Desktop**
 
-Docker Desktop includes Docker Engine and Docker Compose v2.
+Optional:
 
-### Optional database GUI
+3. **DB Browser for SQLite** — free GUI for inspecting `data\email-client.db`.
 
-Install **DB Browser for SQLite** if you want to inspect the local database visually. On Windows:
+Install the optional SQLite GUI with:
 
 ```powershell
 winget install -e --id DBBrowserForSQLite.DBBrowserForSQLite
 ```
 
-It is not required by the app. The app uses Python's built-in `sqlite3` library.
+You do not need SQLite Server, MySQL, PostgreSQL, SQL Server, Supabase, or another database service. Python's `sqlite3` library creates and manages the database file.
 
-## 2. Get the project
+## 2. Get/update the repository
+
+New clone:
 
 ```powershell
 git clone https://github.com/oibaf88/email-client.git
 cd email-client
 ```
 
-Confirm Docker:
+Existing clone:
+
+```powershell
+cd email-client
+git pull
+```
+
+Verify Docker:
 
 ```powershell
 docker --version
 docker compose version
 ```
 
-## 3. Start the application
-
-### Windows / Docker Desktop
+## 3. Start the local runtime
 
 ```powershell
 docker compose up --build
 ```
-
-No UID/GID configuration is required on Windows.
-
-### Linux
-
-The container runs without root privileges. Export your host UID/GID so it can write the bind-mounted `data` directory:
-
-```bash
-export LOCAL_UID="$(id -u)"
-export LOCAL_GID="$(id -g)"
-docker compose up --build
-```
-
-The first build installs the Python dependencies and creates the container.
 
 Open:
 
@@ -67,118 +58,139 @@ Open:
 http://127.0.0.1:8000
 ```
 
-The Compose port mapping is intentionally:
+Docker publishes the web application on loopback only. Other computers on the network cannot reach it through the normal configuration.
 
-```yaml
-127.0.0.1:8000:8000
+On Linux, if needed:
+
+```bash
+export LOCAL_UID="$(id -u)"
+export LOCAL_GID="$(id -g)"
+docker compose up --build
 ```
 
-This means the service is reachable from your own computer, not from other devices on your LAN by default.
+## 4. Create the local database
 
-## 4. Database creation
+You do not create it manually.
 
-You do not create the database manually.
-
-On the first request, Flask creates:
+The first request creates:
 
 ```text
 data/email-client.db
 ```
 
-and initializes the `messages` schema plus sample rows.
+with a `mail_config` table. The table contains only non-secret server settings. It does not have a password column.
 
-Docker mounts:
+The Docker bind mount is:
 
 ```text
 ./data -> /app/data
 ```
 
-so the SQLite file lives on your Windows filesystem rather than disappearing with the container.
+so deleting/rebuilding the container does not delete your configuration.
 
-## 5. Verify the installation
+## 5. Configure real mail
 
-In a second PowerShell window:
+On first launch choose **Configure** and enter the settings from your provider:
+
+```text
+mail domain      optional
+IMAP host        required
+IMAP port        required, commonly 993
+SMTP host        required
+SMTP port        required, commonly 587 or 465
+Sent folder      optional fallback, defaults to Sent
+```
+
+Then choose **Sign in** and enter:
+
+- the full mailbox email address;
+- the password or app-password accepted by that provider for IMAP/SMTP.
+
+The app tests the credential against IMAP before establishing the local session.
+
+### Credential storage
+
+The password is **not** written to:
+
+- SQLite;
+- `.env`;
+- frontend JavaScript/localStorage;
+- Git.
+
+It is kept temporarily in a Flask server-side filesystem session. Signing out clears it. With the default random `FLASK_SECRET_KEY`, restarting the app invalidates the previous browser session as well.
+
+## 6. TLS behavior
+
+IMAP connects with TLS and certificate validation, minimum TLS 1.2.
+
+SMTP behavior:
+
+- port `465`: implicit TLS;
+- any other configured SMTP port: the server must advertise STARTTLS before authentication.
+
+The app will not silently send credentials over plaintext SMTP.
+
+## 7. Verify local operation
 
 ```powershell
 docker compose ps
 ```
 
-The web container should become `healthy`.
+The container should become `healthy`.
 
-You can also test:
+Health endpoints:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/healthz
 Invoke-RestMethod http://127.0.0.1:8000/readyz
 ```
 
-Expected readiness includes:
+`/readyz` verifies the local SQLite runtime. `mail_configured` tells you whether IMAP/SMTP settings have been saved; readiness does not contact the remote mail server.
 
-```text
-status   : ready
-mode     : local
-storage  : sqlite
-database : email-client.db
-```
-
-## 6. Normal start and stop
-
-Start:
+## 8. Start, stop and rebuild
 
 ```powershell
+# start
 docker compose up -d
-```
 
-View logs:
-
-```powershell
+# logs
 docker compose logs -f web
-```
 
-Stop:
-
-```powershell
+# stop
 docker compose down
-```
 
-Rebuild after changing Python code or dependencies:
+# rebuild
+docker compose up -d --build
 
-```powershell
-docker compose up --build -d
-```
-
-Full clean image rebuild:
-
-```powershell
+# complete image rebuild
 docker compose build --no-cache
 docker compose up -d
 ```
 
-## 7. Database maintenance
+## 9. SQLite backup and inspection
 
-### Backup
-
-Stop the app first:
+Stop the app before manually changing the database:
 
 ```powershell
 docker compose down
 ```
 
-Then copy the database:
+Backup:
 
 ```powershell
 Copy-Item .\data\email-client.db .\data\email-client.backup.db
 ```
 
-### Restore
+Open `data\email-client.db` in DB Browser for SQLite and inspect `mail_config`.
+
+Restore:
 
 ```powershell
-docker compose down
 Copy-Item .\data\email-client.backup.db .\data\email-client.db -Force
 docker compose up -d
 ```
 
-### Start from an empty database
+Reset all saved local mail settings:
 
 ```powershell
 docker compose down
@@ -186,38 +198,11 @@ Remove-Item .\data\email-client.db*
 docker compose up -d
 ```
 
-The schema and sample messages are recreated automatically.
+SQLite may create `-wal` and `-shm` sidecar files while running. They are normal and ignored by Git.
 
-### Inspect with DB Browser for SQLite
+## 10. Native Python alternative
 
-Stop the container, open `data\email-client.db`, inspect the `messages` table, close the file, then restart Docker.
-
-SQLite uses WAL mode, so while the app is running you may also see:
-
-```text
-email-client.db-wal
-email-client.db-shm
-```
-
-These are normal SQLite files. Do not commit them.
-
-## 8. Optional local configuration
-
-Copy:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-The default values are enough for normal use.
-
-If you run `python app.py` directly, `.env` is loaded automatically.
-
-Docker Compose intentionally supplies its essential local values itself. If you want Docker to use custom values, edit `compose.yaml` or add Compose variable interpolation deliberately.
-
-## 9. Native Python deployment
-
-Docker is recommended, but not required.
+Docker is optional:
 
 ```powershell
 py -3.14 -m venv .venv
@@ -227,79 +212,55 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Open `http://127.0.0.1:8000`.
+The same SQLite path `data\email-client.db` is used by default.
 
-To stop, press `Ctrl+C`.
+## 11. What local-only means here
 
-## 10. What was intentionally removed
+Local-only means:
 
-The local-only conversion removes runtime infrastructure that no longer has a purpose:
+- Flask runs only on your PC;
+- SQLite lives only on your PC;
+- server settings live only in SQLite;
+- session credentials live only in the local Flask session;
+- no Render/VPS/cloud database is required;
+- no mail server is hosted by this repository.
 
-- `render.yaml`
-- `compose.prod.yaml`
-- `infra/`
-- the VPS/mail-server setup documentation
-- Redis runtime dependency
-- Flask-Session runtime dependency
-- Docker Mailserver
-- Caddy
-- Let's Encrypt/certbot scripts
-- DNS/MTA-STS configuration
-- IMAP/SMTP login and network mail transport
+It does **not** mean offline email. Reading and sending real mail necessarily connects to the configured IMAP/SMTP provider.
 
-The repository retains GitHub Actions only for automated tests. GitHub Actions is not involved when the app runs on your PC.
+## 12. Provider compatibility
 
-## 11. Troubleshooting
+This implementation uses password/app-password authentication for IMAP and SMTP.
 
-### Port 8000 is already in use
+If your provider requires OAuth 2.0 and has disabled password/app-password access, login will fail until OAuth support is implemented. Use only authentication methods permitted by your provider; do not weaken account security settings just to make the client work.
 
-Check:
+## 13. Troubleshooting
+
+### Port 8000 is occupied
 
 ```powershell
 Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
 ```
 
-Stop the conflicting process or change the host side of the mapping in `compose.yaml`, for example:
+Change the host side of the Compose mapping if needed, for example `127.0.0.1:8080:8000`.
 
-```yaml
-ports:
-  - "127.0.0.1:8080:8000"
-```
+### IMAP login fails
 
-Then open `http://127.0.0.1:8080`.
+Check the exact provider documentation for:
 
-### Docker cannot write `data`
+- IMAP hostname/port;
+- whether IMAP access is enabled;
+- whether an app-password is required;
+- whether password authentication has been disabled in favor of OAuth.
 
-Because `data/.gitkeep` creates the directory when the repository is cloned, this should normally work.
+### SMTP login/send fails
 
-On Windows, recreate a deleted directory with:
-
-```powershell
-New-Item -ItemType Directory -Force .\data
-```
-
-On Linux, also export the host UID/GID before starting:
-
-```bash
-export LOCAL_UID="$(id -u)"
-export LOCAL_GID="$(id -g)"
-docker compose up -d
-```
+Check the SMTP hostname, submission port and authentication policy. Port 587 must advertise STARTTLS; port 465 uses implicit TLS.
 
 ### Database is locked
 
-Stop the app and any SQLite GUI:
+Stop both Docker and DB Browser for SQLite, then restart:
 
 ```powershell
 docker compose down
-```
-
-Close DB Browser for SQLite, then start again:
-
-```powershell
 docker compose up -d
 ```
-
-### Reset does not mean delete the database
-
-The UI reset repopulates sample data in the existing SQLite file. To completely recreate the file, follow the "Start from an empty database" commands above.

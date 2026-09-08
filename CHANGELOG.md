@@ -1,28 +1,28 @@
 # Changelog
 
+## 2.1.0 — Local runtime + real mail
+
+- Clarified local-only as a deployment/storage boundary rather than offline/demo behavior.
+- Restored real IMAP-over-TLS mailbox reading.
+- Restored SMTP delivery using TLS/STARTTLS.
+- Added local SQLite storage for non-secret IMAP/SMTP configuration.
+- Added a local configuration UI and sign-in flow.
+- Mailbox passwords are kept only in server-side local sessions and are never saved to SQLite.
+- Kept the one-container localhost-only Docker architecture.
+- Kept Render, VPS, Docker Mailserver, Caddy, Redis and cloud database infrastructure removed.
+- Added offline tests for real-mail code paths via mocks.
+
 ## 2.0.0 — Local SQLite
 
-- Converted the project to a local-only runtime.
-- Replaced session-only synthetic mailbox state with persistent SQLite storage.
-- Added automatic local database schema creation and sample seeding.
-- Removed IMAP and SMTP network mail code.
-- Removed Redis and Flask-Session runtime dependencies.
-- Removed Render deployment configuration.
-- Removed the VPS Docker Mailserver/Caddy/certbot/DNS infrastructure.
-- Removed the production Compose stack.
-- Simplified Docker Compose to one localhost-bound Flask container.
-- Added host-persistent `data/email-client.db` storage.
-- Added a local-only web interface and local message composition.
-- Added `DEPLOY.md` with Windows/Docker/SQLite setup and maintenance.
-- Rewrote tests for the local SQLite architecture.
+- Converted the project to a localhost-only runtime and SQLite storage.
+- Removed hosted/VPS infrastructure.
+- Added Docker/SQLite deployment documentation.
 
 ## 1.2.0 — Safe Showcase
 
-- Added explicit showcase/live boundaries.
-- Added synthetic showcase mailbox behavior.
-- Added security headers, CSRF protection, validation limits, health checks, and CI.
+- Added explicit showcase/live boundaries and security controls.
 - Added optional private live mail infrastructure.
 
 ## 1.0.0
 
-- Initial project.
+- Initial browser-based email client.

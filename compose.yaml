@@ -11,9 +11,9 @@ services:
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     environment:
       APP_ENV: local
-      APP_RELEASE: "2.0.0"
+      APP_RELEASE: "2.1.0"
       DATABASE_PATH: /app/data/email-client.db
-      LOCAL_ADDRESS: local@localhost.invalid
+      SESSION_FILE_DIR: /tmp/email-client-sessions
       HOME: /tmp
     ports:
       - "127.0.0.1:8000:8000"

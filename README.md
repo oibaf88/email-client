@@ -1,82 +1,91 @@
 # BFAB Local Mail
 
-BFAB Local Mail is now a **local-only** webmail-style application. It runs on your own computer, stores its data in a local SQLite database, and does not require Render, Supabase, Redis, PostgreSQL, Docker Mailserver, Caddy, IMAP, SMTP, a domain, TLS certificates, or any cloud account.
+BFAB Local Mail is a **localhost-only email client**. The application server and its configuration database run on your own computer; it connects outward only to the IMAP and SMTP servers that you configure in order to read and send real mail.
 
-## What changed in v2.0.0
+It does **not** require Render, Supabase, Redis, PostgreSQL, a VPS, Docker Mailserver, Caddy, a public domain, inbound ports, or TLS certificates for the local web UI.
 
-The previous repository supported a public showcase mode and an optional self-hosted mail-server stack. That architecture has been removed.
-
-The current architecture is deliberately simple:
+## Architecture
 
 ```text
 Browser
   |
   | http://127.0.0.1:8000
   v
-Flask application
+Local Flask application
+  |             |
+  |             +--> SQLite: data/email-client.db
+  |                  (IMAP/SMTP settings only; NO mailbox password)
   |
-  v
-SQLite
-data/email-client.db
+  +--> IMAP over TLS --------> your existing mail provider
+  +--> SMTP TLS/STARTTLS ----> your existing mail provider
 ```
 
-The app is intentionally bound to localhost in the documented setup.
-
-### Important limitation
-
-This version is **not an Internet mail transport**. Pressing **Send** stores a message in the local `Sent` folder. It does not contact SMTP and does not deliver email to another person.
-
-That is intentional: the project is now fully local and has no external mail dependency.
+The browser UI is local. Your actual mailbox remains on your mail provider.
 
 ## Local database: SQLite
 
-Use **SQLite**. It is free, open source/public domain, embedded in Python, and does not require a database server.
-
-You do **not** need to install SQLite separately for the application. Python already includes the `sqlite3` module.
-
-The database is created automatically on first run:
+Use **SQLite**. No database server needs to be installed. Python already includes SQLite support and the app creates the database automatically:
 
 ```text
 data/email-client.db
 ```
 
-If you want a graphical database viewer, install **DB Browser for SQLite** (free). On Windows you can install it with `winget install -e --id DBBrowserForSQLite.DBBrowserForSQLite`. Use it only while the application is stopped to avoid editing the database while Flask is writing to it.
+SQLite stores only non-secret mail configuration such as:
 
-The main table is:
+- IMAP hostname and port;
+- SMTP hostname and port;
+- optional mail domain;
+- fallback Sent-folder name.
 
-```text
-messages
-├── id
-├── folder
-├── sender
-├── recipient
-├── subject
-├── body
-├── created_at
-└── is_read
+**Your mailbox password is not stored in SQLite.** After login it lives only in a local server-side session and is cleared on sign-out. Restarting with the default random Flask secret also invalidates the old session.
+
+For a free graphical database viewer, use **DB Browser for SQLite**. On Windows:
+
+```powershell
+winget install -e --id DBBrowserForSQLite.DBBrowserForSQLite
 ```
 
-## Recommended setup on Windows: Docker Desktop
+Stop the app before manually editing the database.
+
+## Windows setup with Docker Desktop
 
 Requirements:
 
 - Git
-- Docker Desktop with Docker Compose v2
+- Docker Desktop (includes Docker Compose v2)
 
-Clone the repository and enter it:
+Clone or update the repository:
 
 ```powershell
 git clone https://github.com/oibaf88/email-client.git
 cd email-client
 ```
 
-The repository already contains the `data` directory. Build and start:
+If you already cloned it:
+
+```powershell
+git pull
+```
+
+Build and start:
 
 ```powershell
 docker compose up --build
 ```
 
-On Windows/Docker Desktop, no UID/GID configuration is required. On Linux, if your user is not UID/GID `1000`, export your host IDs before starting so the non-root container can write the bind-mounted SQLite directory:
+Open:
+
+```text
+http://127.0.0.1:8000
+```
+
+On first launch the app opens the mail configuration dialog. Enter the IMAP/SMTP settings supplied by your email provider. Then sign in with your mailbox address and password/app-password.
+
+No UID/GID configuration is needed on Windows/Docker Desktop.
+
+### Linux
+
+The container runs without root privileges. If your host UID/GID is not `1000`:
 
 ```bash
 export LOCAL_UID="$(id -u)"
@@ -84,176 +93,133 @@ export LOCAL_GID="$(id -g)"
 docker compose up --build
 ```
 
-Open:
-
-```text
-http://127.0.0.1:8000
-```
-
-Check status:
+## Normal Docker commands
 
 ```powershell
+# Start in background
+docker compose up -d
+
+# Status
 docker compose ps
-```
 
-Stop:
+# Logs
+docker compose logs -f web
 
-```powershell
+# Stop
 docker compose down
+
+# Rebuild after code/dependency changes
+docker compose up -d --build
 ```
 
-Your database remains on the host at:
+The database persists on your PC at `data\email-client.db` when the container is removed or rebuilt.
+
+## Configure the mailbox
+
+The local UI asks for:
 
 ```text
-data\email-client.db
+Mail domain     optional, e.g. example.com
+IMAP host       provider IMAP hostname
+IMAP port       normally 993
+SMTP host       provider SMTP hostname
+SMTP port       normally 587 or 465
+Sent folder     fallback name, normally Sent
 ```
 
-Rebuilding the Docker image does not delete that database.
+The app requires:
 
-To reset only the sample mailbox, use **Reset sample data** in the UI.
+- IMAP over TLS;
+- SMTP implicit TLS on port 465, or STARTTLS on other configured SMTP ports.
 
-To delete the entire local database and start fresh:
+Some providers no longer accept a normal account password for IMAP/SMTP. In that case use the provider's supported app-password mechanism if available. OAuth-only providers are **not yet supported** by this version.
 
-```powershell
-docker compose down
-Remove-Item .\data\email-client.db*
-docker compose up --build
-```
+Do not guess server settings: use the values documented by your mail provider.
 
 ## Run without Docker
 
-Python 3.14 is the repository target.
-
-Create and activate a virtual environment:
+Python 3.14 is the repository target:
 
 ```powershell
 py -3.14 -m venv .venv
 .venv\Scripts\Activate.ps1
-```
-
-Install dependencies:
-
-```powershell
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+python app.py
 ```
 
-Optional configuration:
+Open `http://127.0.0.1:8000`.
+
+## Optional `.env`
+
+The default setup needs no `.env`. If you want to customize runtime values:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Run:
+The IMAP/SMTP settings themselves are saved from the UI into local SQLite. The mailbox password is deliberately excluded from both `.env` and SQLite.
 
-```powershell
-python app.py
-```
+## Back up the local configuration
 
-Open:
-
-```text
-http://127.0.0.1:8000
-```
-
-The same `data\email-client.db` file is used.
-
-## Optional `.env`
-
-No secrets or configuration are required for the default local setup.
-
-Available variables:
-
-```dotenv
-APP_ENV=local
-APP_RELEASE=2.0.0
-DATABASE_PATH=data/email-client.db
-LOCAL_ADDRESS=local@localhost.invalid
-FLASK_SECRET_KEY=
-```
-
-If `FLASK_SECRET_KEY` is empty, the app generates a random key on startup. That is acceptable for local use; your browser session/CSRF token will simply change after a restart.
-
-Never commit your real `.env` file. `.gitignore` and `.dockerignore` already exclude it.
-
-## Inspect the database with DB Browser for SQLite
-
-1. Stop the app:
+Stop the app and copy the database:
 
 ```powershell
 docker compose down
+Copy-Item .\data\email-client.db .\data\email-client.backup.db
 ```
 
-2. Open DB Browser for SQLite.
-3. Choose **Open Database**.
-4. Open:
-
-```text
-<repository>\data\email-client.db
-```
-
-5. Inspect the `messages` table.
-6. Close/save your changes before restarting the app.
-
-The database is ordinary SQLite, so you can also inspect it from Python:
+Restore:
 
 ```powershell
-python -c "import sqlite3; db=sqlite3.connect('data/email-client.db'); print(db.execute('select folder,count(*) from messages group by folder').fetchall())"
+docker compose down
+Copy-Item .\data\email-client.backup.db .\data\email-client.db -Force
+docker compose up -d
 ```
 
-## API
+Delete the local configuration completely:
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/healthz` | Process liveness |
-| `GET` | `/readyz` | SQLite readiness |
-| `GET` | `/api/state` | Local mode and CSRF token |
-| `GET` | `/api/folders` | Folder counts |
-| `GET` | `/api/messages?folder=INBOX` | Message summaries |
-| `GET` | `/api/messages/:uid?folder=INBOX` | Read one message |
-| `POST` | `/api/messages/:uid/read` | Mark read/unread |
-| `DELETE` | `/api/messages/:uid` | Move to Trash or permanently delete from Trash |
-| `POST` | `/api/send` | Store a local message in Sent |
-| `POST` | `/api/reset` | Restore sample data |
+```powershell
+docker compose down
+Remove-Item .\data\email-client.db*
+docker compose up -d
+```
 
-All write requests require the CSRF token returned by `/api/state`.
+The empty SQLite schema is recreated automatically.
+
+## Security boundary
+
+The web UI is published only on:
+
+```text
+127.0.0.1:8000
+```
+
+It is not intended to be exposed to your LAN or the public Internet. Mail traffic itself necessarily leaves your computer to reach the configured IMAP/SMTP provider and uses TLS.
+
+Mailbox credentials are kept in a server-side filesystem session under the local runtime's temporary directory, not in the browser cookie and not in SQLite.
 
 ## Tests
 
-Install development dependencies:
-
 ```powershell
 pip install -r requirements-dev.txt
-```
-
-Run:
-
-```powershell
 ruff check .
 python -m compileall -q app.py tests
 python -m pytest -q
 ```
 
-GitHub Actions runs the same checks. CI is the only remote service retained because it tests the repository; it is not part of the application runtime.
+GitHub Actions also validates `compose.yaml`, builds the Docker image, starts it, and checks `/readyz`. No real mail server is contacted by tests.
 
 ## Repository map
 
 ```text
-app.py                      Flask + SQLite application
-templates/email_system.html Local-only web UI
-data/.gitkeep               Keeps the local data directory in Git
-Dockerfile                  Local application image
-compose.yaml                One-container local setup
-.env.example                Optional local settings template
-DEPLOY.md                   Full local installation/deployment guide
-tests/test_app.py            Local SQLite/API regression tests
-.github/workflows/ci.yml    Repository CI only
+app.py                       Flask, SQLite config, IMAP/SMTP client
+Dockerfile                   Local Docker image
+compose.yaml                 One-container localhost runtime
+data/.gitkeep                Persistent SQLite directory
+templates/email_system.html  Local web interface
+README.md                    Usage overview
+DEPLOY.md                    Detailed PC setup and operations
+SECURITY.md                  Local threat boundary
+tests/test_app.py            Offline regression tests
 ```
-
-## Security boundary
-
-The supported runtime is localhost. `compose.yaml` publishes the application only to `127.0.0.1:8000`.
-
-Do not expose this development-oriented local application directly to the public Internet. It has no account system because local-only execution is the trust boundary.
-
-See `SECURITY.md` and `DEPLOY.md` for details.
