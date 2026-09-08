@@ -61,6 +61,41 @@ Open `http://127.0.0.1:5000`.
 
 Showcase state is scoped to the server-side session and expires with it. All addresses use reserved `.invalid` domains. A reset endpoint restores the original synthetic dataset.
 
+### Local Docker
+
+The repository includes a production-capable `Dockerfile` and a standalone `compose.local.yaml` for running only the safe showcase. The local Compose file deliberately does **not** start Redis, Docker Mailserver, Caddy, TLS, or any external mailbox connection.
+
+The shortest path is:
+
+```bash
+docker compose -f compose.local.yaml up --build
+```
+
+Then open `http://127.0.0.1:8000`. Check container health with:
+
+```bash
+docker compose -f compose.local.yaml ps
+```
+
+Stop and remove the local container with:
+
+```bash
+docker compose -f compose.local.yaml down
+```
+
+You can also build and run the image without Compose:
+
+```bash
+docker build -t email-client:local .
+docker run --rm -p 127.0.0.1:8000:8000 \
+  -e APP_MODE=showcase \
+  -e APP_ENV=development \
+  -e SESSION_COOKIE_SECURE=false \
+  email-client:local
+```
+
+No `.env` file or real credentials are required for the local showcase. `.dockerignore` excludes `.env` and `.env.*` files from the Docker build context, except the non-secret `.env.example` template.
+
 ### Render
 
 `render.yaml` defines one showcase web service with:
@@ -174,8 +209,10 @@ The test suite verifies the isolated showcase, simulated mail operations, CSRF, 
 ```text
 app.py                         Flask application and mode boundary
 templates/email_system.html    Responsive webmail UI
-render.yaml                    Public showcase deployment only
+Dockerfile                     Application image definition
+compose.local.yaml             Standalone local showcase container
 compose.yaml                   Private live mail appliance
+render.yaml                    Public showcase deployment only
 infra/                         Mailserver, Caddy, DNS and bootstrap assets
 tests/                         API and security regression tests
 .github/workflows/ci.yml       Ruff, compile and pytest checks
