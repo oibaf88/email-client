@@ -38,15 +38,15 @@ shift || true
 
 case "${command}" in
   list)
-    docker compose exec -T mailserver setup alias list
+    docker compose -f compose.prod.yaml exec -T mailserver setup alias list
     ;;
   add)
     require_pair "$@"
-    docker compose exec -T mailserver setup alias add "$@"
+    docker compose -f compose.prod.yaml exec -T mailserver setup alias add "$@"
     ;;
   delete|del|remove|rm)
     require_pair "$@"
-    docker compose exec -T mailserver setup alias del "$@"
+    docker compose -f compose.prod.yaml exec -T mailserver setup alias del "$@"
     ;;
   help|-h|--help|"")
     usage
