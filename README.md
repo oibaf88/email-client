@@ -76,6 +76,14 @@ The repository already contains the `data` directory. Build and start:
 docker compose up --build
 ```
 
+On Windows/Docker Desktop, no UID/GID configuration is required. On Linux, if your user is not UID/GID `1000`, export your host IDs before starting so the non-root container can write the bind-mounted SQLite directory:
+
+```bash
+export LOCAL_UID="$(id -u)"
+export LOCAL_GID="$(id -g)"
+docker compose up --build
+```
+
 Open:
 
 ```text
